@@ -1,0 +1,16 @@
+{
+  "cassandra": {
+    "contactPoint": "localhost",
+    "noAuth": true
+  },
+  "kafka": {
+    "brokers": "localhost:9092",
+    "topics": {
+      "my.topic.name": {
+        "fsmID": "{{ index .Value \"my-jsons-fsm-identifier-key\" }}"
+      }
+    }
+  },
+  "snitchPort": 9009,
+  "serverPort": 9000
+}
