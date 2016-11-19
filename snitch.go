@@ -13,7 +13,7 @@ func (_ *healthCheckHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "OK")
 }
 
-func serveSnitch(addr string) {
+func mustServeSnitch(addr string) {
 	mux := http.NewServeMux()
 	hc := &healthCheckHandler{}
 

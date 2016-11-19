@@ -9,7 +9,7 @@ func main() {
 	kafka := mustSetupCluster(config.Kafka, scrapes)
 
 	go scrape(kafka, config.Kafka.Topics, db)
-	// go serve(bookie{db})
+	go mustServeBookie(fmt.Sprintf("0.0.0.0:%v", config.ServerPort), db)
 
-	serveSnitch(fmt.Sprintf("0.0.0.0:%v", config.SnitchPort))
+	mustServeSnitch(fmt.Sprintf("0.0.0.0:%v", config.SnitchPort))
 }

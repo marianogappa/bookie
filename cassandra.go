@@ -112,3 +112,26 @@ func (db cassandra) mustLoadScrapes() map[string]topicRecord {
 
 	return trs
 }
+
+type FSMRow struct {
+	FSMID       string //TODO include aliases and labels
+	Topic       string
+	Partition   int32
+	StartOffset int64
+	LastOffset  int64
+	Updated     time.Time
+}
+
+func (db cassandra) findFSM(fsmID string) ([]FSMRow, error) {
+	rows := []FSMRow{}
+
+	q := `SELECT fsmID, topic, partition, startOffset, lastOffset, updated FROM bookie.fsm WHERE fsmID = ?`
+	iter := db.session.Query(q, fsmID).Iter()
+
+	row := FSMRow{}
+	for iter.Scan(&row.FSMID, &row.Topic, &row.Partition, &row.StartOffset, &row.LastOffset, &row.Updated) {
+		rows = append(rows, row)
+	}
+
+	return rows, iter.Close()
+}
