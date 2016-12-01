@@ -114,6 +114,7 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 	defer closeRows(dbRows)
 
 	tm := map[string]map[string]string{}
+	fsmMap := map[string]fsm{}
 	for dbRows.Next() {
 		var fsmID, _created, k, v string
 
@@ -133,17 +134,25 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 		if err != nil {
 			return fsms, err
 		}
-
-		f := fsm{
-			ID:      fsmID,
-			Created: created,
+		f, ok := fsmMap[fsmID]
+		if !ok {
+			f = fsm{
+				ID:      fsmID,
+				Created: created,
+			}
+			fsmMap[fsmID] = f
 		}
-		fsms = append(fsms, f)
+
+		ts := f.Tags
+		if len(ts) == 0 {
+			ts := map[string]string{}
+			f.Tags = ts
+		}
+		ts[k] = v
 	}
 
-	for _, f := range fsms {
-		tgs, _ := tm[f.ID]
-		f.Tags = tgs
+	for _, v := range fsmMap {
+		fsms = append(fsms, v)
 	}
 
 	return fsms, nil
