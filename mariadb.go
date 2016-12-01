@@ -286,15 +286,13 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 	fsm := fsm{Topics: map[string]topic{}}
 
 	q := `SELECT
-					fsmID, o.topic, o.topic_partition, o.startOffset, o.lastOffset, f.created, o.updated, o.count, s.lastOffset, t.k, t.v
+					fsmID, o.topic, o.topic_partition, o.startOffset, o.lastOffset, f.created, o.updated, o.count, s.lastOffset
 				FROM
 					bookie.offset o
 				JOIN
 					bookie.fsm f USING(fsmID)
 				JOIN
 					bookie.scrape s USING(topic, topic_partition)
-				JOIN
-				    bookie.tags t USING(fsmID)
 				WHERE
 					fsmID = ?`
 	dbRows, err := m.db.Query(q, fsmID)
@@ -305,19 +303,17 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 	defer closeRows(dbRows)
 
 	topicCounts := map[string]int64{}
-	tags := map[string]string{}
 	for dbRows.Next() {
-		var fsmID, topic, k, v string
+		var fsmID, topic string
 		var part int32
 		var startOffset, lastOffset, count, lastScrapedOffset int64
 		var _created, _updated string
 
-		if err = dbRows.Scan(&fsmID, &topic, &part, &startOffset, &lastOffset, &_created, &_updated, &count, &lastScrapedOffset, &k, &v); err != nil {
+		if err = dbRows.Scan(&fsmID, &topic, &part, &startOffset, &lastOffset, &_created, &_updated, &count, &lastScrapedOffset); err != nil {
 			fs["error"] = err
-			log.WithFields(fs).Errorf("failed to scan execution uuid")
+			log.WithFields(fs).Errorf("failed to scan fsm")
 			return fsm, err
 		}
-		tags[k] = v
 		created, err := time.Parse("2006-01-02 15:04:05", _created)
 		if err != nil {
 			return fsm, err
@@ -344,13 +340,28 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 		topicCounts[topic] += count
 	}
 
-	fsm.Tags = tags
-
-	for t, c := range topicCounts {
-		tp := fsm.Topics[t]
-		tp.Count = c
-		fsm.Topics[t] = tp
+	for tn, c := range topicCounts {
+		t, _ := fsm.Topics[tn]
+		t.Count = c
+		fsm.Topics[tn] = t
 	}
+
+	q = `SELECT k, v FROM bookie.tags WHERE fsmID = ?`
+	dbRows, err = m.db.Query(q, fsmID)
+	if err != nil {
+		return fsm, err
+	}
+	tags := map[string]string{}
+	for dbRows.Next() {
+		var k, v string
+		if err = dbRows.Scan(&k, &v); err != nil {
+			fs["error"] = err
+			log.WithFields(fs).Errorf("failed to scan tags")
+			return fsm, err
+		}
+		tags[k] = v
+	}
+	fsm.Tags = tags
 
 	return fsm, nil
 }
