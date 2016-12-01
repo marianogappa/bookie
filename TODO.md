@@ -31,3 +31,16 @@
 - Basic idea is to go through the topics and take note of offsets where fsmIds were first and last seen
 - Snapshots should be saved at regular offset intervals to allow refreshing data from a given offset; snapshots could contain identical data and endpoint use the latest available
 - Scaping process should hold current snapshot interval (measured in messages); messages that aggregate on existing FSMs should be queried and retrieved. After snapshot interval finishes, results should be stored in a batch.
+
+
+
+#TODO
+
+- Load all FSMs on memory
+- Labels
+- Louge-batching on writes
+- Use mariadb
+- created date
+- endpoint n last fsms
+- implement bookie in flowbro
+- presentation
