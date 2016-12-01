@@ -19,6 +19,7 @@ type fsmDataPoint struct {
 	lastOffset  int64
 
 	changed bool
+	created time.Time
 }
 
 type partition struct {

@@ -128,9 +128,13 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 }
 
 func (m *mariaDB) saveFSM(f fsmDataPoint) error {
-	q := `INSERT INTO bookie.fsm(fsmID, topic, topic_partition, topic_startOffset, topic_lastOffset, updated) values (?, ?, ?, ?, ?, UTC_TIMESTAMP())`
+	q := `INSERT INTO bookie.fsm(fsmID, created) values (?, ?) ON DUPLICATE KEY UPDATE created = ?;
+	INSERT INTO bookie.offset(fsmID, topic, topic_partition, startOffset, lastOffset, updated) values (?, ?, ?, ?, ?, UTC_TIMESTAMP())`
 
 	_, err := m.db.Exec(q,
+		f.fsmID,
+		f.created,
+		f.created,
 		f.fsmID,
 		f.topic,
 		f.partition,
@@ -141,6 +145,7 @@ func (m *mariaDB) saveFSM(f fsmDataPoint) error {
 	if err != nil {
 		fs := log.Fields{
 			"fsmID":       f.fsmID,
+			"created":     f.created,
 			"topic":       f.topic,
 			"partition":   f.partition,
 			"startOffset": f.startOffset,

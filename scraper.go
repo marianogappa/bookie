@@ -43,7 +43,8 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 						fsmID:       fsmID,
 						partition:   m.Partition,
 						topic:       m.Topic,
-						startOffset: m.Offset, // TODO Counts, global Labels missing here
+						created:     time.Now(), // TODO get this from message
+						startOffset: m.Offset,   // TODO Counts, global Labels missing here
 					}
 				}
 				fsms[fsmID].lastOffset = m.Offset
