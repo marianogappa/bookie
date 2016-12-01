@@ -23,8 +23,10 @@ type config struct {
 }
 
 type topicConfig struct {
-	FSMID      string `json:"fsmID"`
-	FSMIDAlias string `json:"fsmIDAlias"`
+	FSMID      string            `json:"fsmID"`
+	FSMIDAlias string            `json:"fsmIDAlias"`
+	Tags       map[string]string `json:"tags"`
+	TimeLayout string            `json:"timeLayout"`
 }
 
 func mustReadConfig() config {

@@ -9,6 +9,7 @@ type fsmDataPoint struct {
 	startOffset int64
 	lastOffset  int64
 	count       int64
+	tags        map[string]string
 
 	changed bool
 	created time.Time

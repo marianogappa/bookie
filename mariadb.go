@@ -186,6 +186,18 @@ func (m *mariaDB) saveFSM(f fsmDataPoint) error {
 		return err
 	}
 
+	for k, v := range f.tags {
+		q := `INSERT INTO bookie.tags(fsmID, k, v) values (?, ?, ?) ON DUPLICATE KEY UPDATE v = ?;`
+
+		_, err := m.db.Exec(q, f.fsmID, k, v, v)
+
+		if err != nil {
+			fs := log.Fields{"fsmID": f.fsmID, "key": k, "value": v, "err": err}
+			log.WithFields(fs).Error("Failed to save FSM tags")
+			return err
+		}
+	}
+
 	return nil
 }
 

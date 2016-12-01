@@ -7,24 +7,26 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-func processMessage(m message, kt map[string]topicConfig, fsmIDAliases map[string]string) (string, error) {
+func processMessage(m message, kt map[string]topicConfig, fsmIDAliases map[string]string) (string, map[string]string, error) {
+	tags := map[string]string{}
+
 	topicDef, ok := kt[m.Topic]
 	if !ok {
 		log.WithFields(log.Fields{"topic": m.Topic}).Warn("Processed message from unknown topic")
-		return "", nil
+		return "", tags, nil
 	}
 
 	bFSMId, err := parseTempl(topicDef.FSMID, m)
 	if err != nil {
-		return "", err
+		return "", tags, err
 	}
 	bFSMIdAlias, err := parseTempl(topicDef.FSMIDAlias, m)
 	if err != nil {
-		return "", err
+		return "", tags, err
 	}
 
 	if len(bFSMId) == 0 {
-		return "", nil
+		return "", tags, nil
 	}
 
 	fsmID := string(bFSMId)
@@ -38,7 +40,16 @@ func processMessage(m message, kt map[string]topicConfig, fsmIDAliases map[strin
 		// TODO Process incomplete events if any
 	}
 
-	return fsmID, nil
+	if td := kt[m.Topic].Tags; len(td) > 0 {
+		for k, v := range td {
+			bV, err := parseTempl(v, m)
+			if err == nil && len(bV) > 0 {
+				tags[k] = string(bV)
+			}
+		}
+	}
+
+	return fsmID, tags, nil
 }
 
 func parseTempl(s string, m message) ([]byte, error) {

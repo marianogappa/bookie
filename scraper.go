@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"strconv"
+	"strings"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -31,7 +33,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 			}
 
 			fsmIDAliases := map[string]string{} // TODO this has to be global to all scrapers
-			fsmID, err := processMessage(m, kt, fsmIDAliases)
+			fsmID, fsmTags, err := processMessage(m, kt, fsmIDAliases)
 			if err != nil {
 				log.WithFields(log.Fields{"err": err, "message": m}).Warn("Could not process message.")
 			}
@@ -43,14 +45,40 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 						fsmID:       fsmID,
 						partition:   m.Partition,
 						topic:       m.Topic,
-						created:     time.Now(), // TODO get this from message
-						startOffset: m.Offset,   // TODO Counts, global Labels missing here
+						startOffset: m.Offset, // TODO Counts, global Labels missing here
 						count:       int64(1),
+						tags:        map[string]string{},
 					}
 				}
 				fsms[fsmID].lastOffset = m.Offset
 				fsms[fsmID].count++
 				fsms[fsmID].changed = true
+
+				for k, v := range fsmTags {
+					if len(k) > 0 && len(v) > 0 {
+						fsms[fsmID].tags[k] = v
+					}
+				}
+
+				if _created, ok := fsms[fsmID].tags["created"]; ok {
+					var err error
+					var _icreated int64
+					var created time.Time
+
+					if kt[m.Topic].TimeLayout == "unix" {
+						_icreated, err = strconv.ParseInt(_created, 10, 64)
+						created = time.Unix(_icreated, 0)
+					} else if kt[m.Topic].TimeLayout == "unixNano" {
+						_icreated, err = strconv.ParseInt(_created, 10, 64)
+						created = time.Unix(0, _icreated)
+					} else {
+						created, err = time.Parse(kt[m.Topic].TimeLayout, _created)
+					}
+
+					if err == nil {
+						fsms[fsmID].created = created
+					}
+				}
 			}
 
 			// TODO persisting aliases
@@ -71,8 +99,11 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 }
 
 func newMessage(cm sarama.ConsumerMessage) (message, error) {
+	d := json.NewDecoder(strings.NewReader(string(cm.Value)))
+	d.UseNumber()
+
 	var v interface{}
-	if err := json.Unmarshal(cm.Value, &v); err != nil {
+	if err := d.Decode(&v); err != nil {
 		return message{}, err
 	}
 

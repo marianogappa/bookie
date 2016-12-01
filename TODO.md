@@ -36,11 +36,15 @@
 
 #TODO
 
-- Load all FSMs on memory
-- Labels
-- Louge-batching on writes
-- Use mariadb ------------------------------------- Done
-- created date
-- endpoint n last fsms
-- implement bookie in flowbro
-- presentation
+[ ] - Load all FSMs on memory
+[ ] - Labels
+[ ] - Louge-batching on writes
+[√] - Use mariadb
+[ ] - created date
+[ ] - endpoint n last fsms
+[ ] - implement bookie in flowbro
+[ ] - presentation
+
+
+
+

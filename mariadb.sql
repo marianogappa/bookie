@@ -31,6 +31,13 @@ CREATE TABLE IF NOT EXISTS bookie.offset (
 
 CREATE TABLE IF NOT EXISTS bookie.fsmAliases (
     fsmID varchar(100) NOT NULL,
-	fsmAlias varchar(100) NOT NULL,
-	PRIMARY KEY (fsmID, fsmAlias)
+    fsmAlias varchar(100) NOT NULL,
+    PRIMARY KEY (fsmID, fsmAlias)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS bookie.tags (
+    fsmID varchar(100) NOT NULL,
+    k varchar(100) NOT NULL,
+	v text NOT NULL,
+	PRIMARY KEY (fsmID, k)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
