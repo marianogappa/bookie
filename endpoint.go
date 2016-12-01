@@ -15,18 +15,18 @@ type serverHandler struct {
 
 func (h *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
-	case strings.HasPrefix(r.URL.Path, "/getFSMByID"):
-		h.getFSMByID(w, r)
-	case r.URL.Path == "/getLastFSMs":
-		h.getLastNFSMs(w, r)
+	case strings.HasPrefix(r.URL.Path, "/fsm"):
+		h.fsm(w, r)
+	case r.URL.Path == "/latest":
+		h.latest(w, r)
 	default:
 		log.WithFields(log.Fields{"path": r.URL.Path}).Error("unsupported path")
 		http.Error(w, "Not found", 404)
 	}
 }
 
-func (h *serverHandler) getFSMByID(w http.ResponseWriter, r *http.Request) {
-	fsmID := r.URL.Query().Get("fsmID")
+func (h *serverHandler) fsm(w http.ResponseWriter, r *http.Request) {
+	fsmID := r.URL.Query().Get("id")
 
 	if fsmID == "" {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
@@ -48,8 +48,8 @@ func (h *serverHandler) getFSMByID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *serverHandler) getLastNFSMs(w http.ResponseWriter, r *http.Request) {
-	ns := r.URL.Query().Get("number")
+func (h *serverHandler) latest(w http.ResponseWriter, r *http.Request) {
+	ns := r.URL.Query().Get("n")
 
 	if ns == "" {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)

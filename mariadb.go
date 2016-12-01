@@ -78,8 +78,8 @@ func (m *mariaDB) saveScrape(topic string, partition int32, offset int64) error 
 	_, err := m.db.Exec(q,
 		topic,
 		partition,
-		offset,
-		offset,
+		offset+1,
+		offset+1,
 	)
 
 	if err != nil {
@@ -103,7 +103,7 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 		  FROM
 		  		(SELECT fsmID, created FROM bookie.fsm ORDER BY created DESC LIMIT ?) f
 		  INNER JOIN
-		  		offset o USING fsmID`
+					bookie.offset o USING (fsmID)`
 
 	dbRows, err := m.db.Query(q, n)
 	if err != nil {
@@ -117,10 +117,15 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 		var fsmID, topicValue string
 		var partitionValue int32
 		var startOffset, lastOffset, count int64
-		var created time.Time
+		var _created string
 
-		if err = dbRows.Scan(&fsmID, &created, &topicValue, &partitionValue, &startOffset, &lastOffset, &count); err != nil {
+		if err = dbRows.Scan(&fsmID, &_created, &topicValue, &partitionValue, &startOffset, &lastOffset, &count); err != nil {
 			log.WithFields(log.Fields{"err": err, "number": n}).Errorf("failed to get last n fsms")
+			return fsms, err
+		}
+
+		created, err := time.Parse("2006-01-02 15:04:05", _created)
+		if err != nil {
 			return fsms, err
 		}
 
@@ -273,7 +278,7 @@ func (m *mariaDB) findFSM(fsmID string) ([]FSMRow, error) {
 	)
 	rows := []FSMRow{}
 
-	q := `SELECT fsmID, topic, partition, startOffset, lastOffset, updated FROM bookie.fsm WHERE fsmID = ?`
+	q := `SELECT fsmID, topic, topic_partition, startOffset, lastOffset, updated FROM bookie.offset WHERE fsmID = ?`
 	dbRows, err := m.db.Query(q, fsmID)
 	if err != nil {
 		return rows, err
@@ -285,13 +290,19 @@ func (m *mariaDB) findFSM(fsmID string) ([]FSMRow, error) {
 		var fsmID, topic string
 		var partition int32
 		var startOffset, lastOffset int64
-		var updated time.Time
+		var _updated string
 
-		if err = dbRows.Scan(&fsmID, &topic, &partition, &startOffset, &lastOffset, &updated); err != nil {
+		if err = dbRows.Scan(&fsmID, &topic, &partition, &startOffset, &lastOffset, &_updated); err != nil {
 			fs["error"] = err
 			log.WithFields(fs).Errorf("failed to scan execution uuid")
 			return rows, err
 		}
+
+		updated, err := time.Parse("2006-01-02 15:04:05", _updated)
+		if err != nil {
+			return rows, err
+		}
+
 		rows = append(rows, FSMRow{
 			FSMID:       fsmID,
 			Topic:       topic,
