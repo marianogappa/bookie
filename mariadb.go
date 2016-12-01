@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"io/ioutil"
-	"regexp"
 	"strings"
 	"time"
 
@@ -39,25 +38,20 @@ func setupMariaDB(conf mariadbConfig) (*mariaDB, error) {
 
 	log.Infof("Set up MariaDB connection for %#v.", conf.URL)
 
-	mustSetupTables(db)
+	mustRunMariaDBSQL(db)
 
 	log.Infof("Initialize schema and tables")
 
 	return &mariaDB{db}, nil
 }
 
-func mustSetupTables(db *sql.DB) {
-	createTableRegexp := regexp.MustCompile("(?s)(CREATE TABLE.+?;)")
-
+func mustRunMariaDBSQL(db *sql.DB) {
 	queries, err := ioutil.ReadFile("mariadb.sql")
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Fatalf("Failed to read cql initialization file.")
 	}
 
-	createQueries := createTableRegexp.FindAllString(string(queries), -1)
-	for _, query := range createQueries {
-		mustRunQuery(db, query)
-	}
+	mustRunQuery(db, string(queries))
 }
 
 func mustRunQuery(db *sql.DB, sql string) {
