@@ -2,15 +2,6 @@ package main
 
 import "time"
 
-type FSMRow struct {
-	FSMID       string //TODO include aliases and labels
-	Topic       string
-	Partition   int32
-	StartOffset int64
-	LastOffset  int64
-	Updated     time.Time
-}
-
 type fsmDataPoint struct {
 	fsmID       string
 	topic       string
