@@ -46,7 +46,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 						partition:   m.Partition,
 						topic:       m.Topic,
 						startOffset: m.Offset, // TODO Counts, global Labels missing here
-						count:       int64(1),
+						count:       int64(0),
 						tags:        map[string]string{},
 					}
 				}
