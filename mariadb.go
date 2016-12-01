@@ -144,7 +144,7 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 		}
 
 		ts := f.Tags
-		if len(ts) == 0 {
+		if ts == nil {
 			ts := map[string]string{}
 			f.Tags = ts
 		}
