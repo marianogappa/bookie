@@ -4,7 +4,7 @@ import "fmt"
 
 func main() {
 	config := mustReadConfig()
-	db := mustSetupCassandra(config.Cassandra)
+	db := mustSetupMariaDB(config.Mariadb)
 	scrapes := db.mustLoadScrapes()
 	kafka := mustSetupCluster(config.Kafka, scrapes)
 

@@ -6,11 +6,8 @@ import (
 	"log"
 )
 
-type cassandraConfig struct {
-	ContactPoint string `json:"contactPoint"`
-	NoAuth       bool   `json:"noAuth"`
-	User         string `json:"user"`
-	Pass         string `json:"pass"`
+type mariadbConfig struct {
+	URL string `json:"url"`
 }
 
 type kafkaConfig struct {
@@ -19,10 +16,10 @@ type kafkaConfig struct {
 }
 
 type config struct {
-	SnitchPort int             `json:"snitchPort"`
-	ServerPort int             `json:"serverPort"`
-	Cassandra  cassandraConfig `json:"cassandra"`
-	Kafka      kafkaConfig     `json:"kafka"`
+	SnitchPort int           `json:"snitchPort"`
+	ServerPort int           `json:"serverPort"`
+	Mariadb    mariadbConfig `json:"mariadb"`
+	Kafka      kafkaConfig   `json:"kafka"`
 }
 
 type topic struct {

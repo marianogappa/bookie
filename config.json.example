@@ -1,7 +1,6 @@
 {
-  "cassandra": {
-    "contactPoint": "localhost",
-    "noAuth": true
+  "mariadb": {
+    "url": "root@tcp(mc-red-test-2.movio-dev.co:3306)/vc_test"
   },
   "kafka": {
     "brokers": "localhost:9092",

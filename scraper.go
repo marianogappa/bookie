@@ -11,13 +11,13 @@ import (
 	"github.com/Shopify/sarama"
 )
 
-func scrape(k cluster, kt map[string]topic, c cassandra) {
+func scrape(k cluster, kt map[string]topic, db mariaDB) {
 	for _, ch := range k.chs {
-		go scrapePartition(ch, kt, c)
+		go scrapePartition(ch, kt, db)
 	}
 }
 
-func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topic, c cassandra) {
+func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topic, db mariaDB) {
 	// TODO can't be 100% on memory
 	// TODO has to be populated on startup or lazily, but if empty it will calculate incorrect StartOffsets and Counts
 	fsms := map[string]*FSMDataPoint{}
@@ -55,13 +55,13 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topic, c c
 			if math.Mod(float64(m.Offset), 1000) == float64(0) { // TODO this is pointless if we don't populate fsms to current snapshot on startup
 				for i := range fsms { // TODO this is very inefficient! Several connections seems to make sense here.
 					if fsms[i].changed {
-						c.saveFSM(*fsms[i])
+						db.saveFSM(*fsms[i])
 						fmt.Println("Saved", fsms[i].FSMID)
 						fsms[i].changed = false
 					}
 				}
 
-				c.saveScrape(m.Topic, m.Partition, m.Offset)
+				db.saveScrape(m.Topic, m.Partition, m.Offset)
 			}
 		}
 	}

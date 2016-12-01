@@ -8,7 +8,7 @@ import (
 )
 
 type serverHandler struct {
-	db cassandra
+	db *mariaDB
 }
 
 func (h *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +34,7 @@ func (h *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func mustServeBookie(addr string, db cassandra) {
+func mustServeBookie(addr string, db *mariaDB) {
 	mux := http.NewServeMux()
 	sh := &serverHandler{db: db}
 
