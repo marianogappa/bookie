@@ -7,7 +7,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 )
 
-func processMessage(m message, kt map[string]topic, fsmIdAliases map[string]string) (string, error) {
+func processMessage(m message, kt map[string]topicConfig, fsmIDAliases map[string]string) (string, error) {
 	topicDef, ok := kt[m.Topic]
 	if !ok {
 		log.WithFields(log.Fields{"topic": m.Topic}).Warn("Processed message from unknown topic")
@@ -27,18 +27,18 @@ func processMessage(m message, kt map[string]topic, fsmIdAliases map[string]stri
 		return "", nil
 	}
 
-	fsmId := string(bFSMId)
-	fsmIdAlias := string(bFSMIdAlias)
-	if fa, ok := fsmIdAliases[fsmId]; len(fa) > 0 && ok {
-		fsmId = fa
+	fsmID := string(bFSMId)
+	fsmIDAlias := string(bFSMIdAlias)
+	if fa, ok := fsmIDAliases[fsmID]; len(fa) > 0 && ok {
+		fsmID = fa
 	}
-	if _, ok := fsmIdAliases[fsmIdAlias]; !ok && len(fsmIdAlias) > 0 && len(fsmId) > 0 { // if new id/alias pair
-		fsmIdAliases[fsmIdAlias] = fsmId // save new alias definition
+	if _, ok := fsmIDAliases[fsmIDAlias]; !ok && len(fsmIDAlias) > 0 && len(fsmID) > 0 { // if new id/alias pair
+		fsmIDAliases[fsmIDAlias] = fsmID // save new alias definition
 
 		// TODO Process incomplete events if any
 	}
 
-	return fsmId, nil
+	return fsmID, nil
 }
 
 func parseTempl(s string, m message) ([]byte, error) {

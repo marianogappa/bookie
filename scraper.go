@@ -11,13 +11,13 @@ import (
 	"github.com/Shopify/sarama"
 )
 
-func scrape(k cluster, kt map[string]topic, db *mariaDB) {
+func scrape(k cluster, kt map[string]topicConfig, db *mariaDB) {
 	for _, ch := range k.chs {
 		go scrapePartition(ch, kt, db)
 	}
 }
 
-func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topic, db *mariaDB) {
+func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfig, db *mariaDB) {
 	// TODO can't be 100% on memory
 	// TODO has to be populated on startup or lazily, but if empty it will calculate incorrect StartOffsets and Counts
 	fsms := map[string]*fsmDataPoint{}

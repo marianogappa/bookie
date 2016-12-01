@@ -25,7 +25,6 @@ func mustSetupMariaDB(config mariadbConfig) *mariaDB {
 }
 
 func setupMariaDB(conf mariadbConfig) (*mariaDB, error) {
-
 	db, err := sql.Open("mysql", conf.URL)
 	if err != nil {
 		return nil, err
@@ -63,14 +62,69 @@ func (m *mariaDB) saveScrape(topic string, partition int32, offset int64) error 
 	return nil
 }
 
-type fsmDataPoint struct {
-	fsmID       string
-	topic       string
-	partition   int32
-	startOffset int64
-	lastOffset  int64
+func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
+	fsms := []fsm{}
+	q := `SELECT 
+			f.fsmID, f.created, o.topic, o.topic_partition, o.startOffset, o.lastOffset, o.count
+		  FROM 
+		  		(SELECT fsmID, created FROM bookie.fsm ORDER BY created DESC LIMIT ?) f 
+		  INNER JOIN 
+		  		offset o USING fsmID`
 
-	changed bool
+	dbRows, err := m.db.Query(q, n)
+	if err != nil {
+		return fsms, err
+	}
+
+	defer closeRows(dbRows)
+
+	fsmMap := map[string]fsm{}
+	for dbRows.Next() {
+		var fsmID, topicValue string
+		var partitionValue int32
+		var startOffset, lastOffset, count int64
+		var created time.Time
+
+		if err = dbRows.Scan(&fsmID, &created, &topicValue, &partitionValue, &startOffset, &lastOffset, &count); err != nil {
+			log.WithFields(log.Fields{"err": err, "number": n}).Errorf("failed to get last n fsms")
+			return fsms, err
+		}
+
+		f, ok := fsmMap[fsmID]
+		if !ok {
+			f = fsm{
+				ID:      fsmID,
+				Created: created,
+				Topics:  map[string]topic{},
+			}
+			fsmMap[fsmID] = f
+		}
+
+		t, ok := f.Topics[topicValue]
+		if !ok {
+			t = topic{
+				Partitions: map[int32]partition{},
+				Count:      0,
+			}
+			f.Topics[topicValue] = t
+		}
+
+		_, ok = t.Partitions[partitionValue]
+		if !ok {
+			p := partition{
+				Start: startOffset,
+				End:   lastOffset,
+				Count: count,
+			}
+			t.Partitions[partitionValue] = p
+		}
+	}
+
+	for _, f := range fsmMap {
+		fsms = append(fsms, f)
+	}
+
+	return fsms, nil
 }
 
 func (m *mariaDB) saveFSM(f fsmDataPoint) error {
@@ -146,15 +200,6 @@ func (m *mariaDB) mustLoadScrapes() map[string]topicRecord {
 	}
 
 	return trs
-}
-
-type FSMRow struct {
-	FSMID       string //TODO include aliases and labels
-	Topic       string
-	Partition   int32
-	StartOffset int64
-	LastOffset  int64
-	Updated     time.Time
 }
 
 func (m *mariaDB) findFSM(fsmID string) ([]FSMRow, error) {

@@ -11,16 +11,24 @@ CREATE TABLE IF NOT EXISTS bookie.scrape (
 ) ENGINE=InnoDB AUTO_INCREMENT=2627 DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS bookie.fsm (
+    fsmID varchar(100) NOT NULL,
+    created datetime DEFAULT NULL,
+    PRIMARY KEY (fsmID),
+) ENGINE=InnoDB AUTO_INCREMENT=2627 DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS bookie.offset {
     id int(11) NOT NULL AUTO_INCREMENT,
     fsmID varchar(100) NOT NULL,
 	topic varchar(100) NOT NULL,
     topic_partition int(11) NOT NULL,
-    topic_startOffset bigint(11) NOT NULL,
-    topic_lastOffset bigint(11) NOT NULL,
+    startOffset bigint(11) NOT NULL,
+    lastOffset bigint(11) NOT NULL,
+    count int(11) DEFAULT 0,
     updated datetime DEFAULT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uniqueScrapedFSM (fsmID, topic, topic_partition)
+    UNIQUE KEY uniqueScrapedFSM (fsm, topic, topic_partition)
 ) ENGINE=InnoDB AUTO_INCREMENT=2627 DEFAULT CHARSET=utf8;
+}
 
 CREATE TABLE IF NOT EXISTS bookie.fsmAliases (
     id int(11) NOT NULL AUTO_INCREMENT,

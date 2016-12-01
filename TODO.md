@@ -39,7 +39,7 @@
 - Load all FSMs on memory
 - Labels
 - Louge-batching on writes
-- Use mariadb
+- Use mariadb ------------------------------------- Done
 - created date
 - endpoint n last fsms
 - implement bookie in flowbro

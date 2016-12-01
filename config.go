@@ -11,8 +11,8 @@ type mariadbConfig struct {
 }
 
 type kafkaConfig struct {
-	Brokers string           `json:"brokers"`
-	Topics  map[string]topic `json:"topics"`
+	Brokers string                 `json:"brokers"`
+	Topics  map[string]topicConfig `json:"topics"`
 }
 
 type config struct {
@@ -22,7 +22,7 @@ type config struct {
 	Kafka      kafkaConfig   `json:"kafka"`
 }
 
-type topic struct {
+type topicConfig struct {
 	FSMID      string `json:"fsmID"`
 	FSMIDAlias string `json:"fsmIDAlias"`
 }
