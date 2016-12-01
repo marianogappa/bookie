@@ -63,34 +63,34 @@ func (m *mariaDB) saveScrape(topic string, partition int32, offset int64) error 
 	return nil
 }
 
-type FSMDataPoint struct {
-	FSMID       string
-	Topic       string
-	Partition   int32
-	StartOffset int64
-	LastOffset  int64
+type fsmDataPoint struct {
+	fsmID       string
+	topic       string
+	partition   int32
+	startOffset int64
+	lastOffset  int64
 
 	changed bool
 }
 
-func (m *mariaDB) saveFSM(f FSMDataPoint) error {
+func (m *mariaDB) saveFSM(f fsmDataPoint) error {
 	q := `INSERT INTO bookie.fsm(fsmID, topic, topic_partition, topic_startOffset, topic_lastOffset, updated) values (?, ?, ?, ?, ?, UTC_TIMESTAMP())`
 
 	_, err := m.db.Exec(q,
-		f.FSMID,
-		f.Topic,
-		f.Partition,
-		f.StartOffset,
-		f.LastOffset,
+		f.fsmID,
+		f.topic,
+		f.partition,
+		f.startOffset,
+		f.lastOffset,
 	)
 
 	if err != nil {
 		fs := log.Fields{
-			"fsmID":       f.FSMID,
-			"topic":       f.Topic,
-			"partition":   f.Partition,
-			"startOffset": f.StartOffset,
-			"lastOffset":  f.LastOffset,
+			"fsmID":       f.fsmID,
+			"topic":       f.topic,
+			"partition":   f.partition,
+			"startOffset": f.startOffset,
+			"lastOffset":  f.lastOffset,
 		}
 		log.WithFields(fs).Error("Failed to save FSM")
 		return err

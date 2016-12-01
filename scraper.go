@@ -11,16 +11,16 @@ import (
 	"github.com/Shopify/sarama"
 )
 
-func scrape(k cluster, kt map[string]topic, db mariaDB) {
+func scrape(k cluster, kt map[string]topic, db *mariaDB) {
 	for _, ch := range k.chs {
 		go scrapePartition(ch, kt, db)
 	}
 }
 
-func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topic, db mariaDB) {
+func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topic, db *mariaDB) {
 	// TODO can't be 100% on memory
 	// TODO has to be populated on startup or lazily, but if empty it will calculate incorrect StartOffsets and Counts
-	fsms := map[string]*FSMDataPoint{}
+	fsms := map[string]*fsmDataPoint{}
 
 	for {
 		select {
@@ -39,14 +39,14 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topic, db 
 			if len(fsmID) > 0 {
 				_, ok := fsms[fsmID]
 				if !ok {
-					fsms[fsmID] = &FSMDataPoint{
-						FSMID:       fsmID,
-						Partition:   m.Partition,
-						Topic:       m.Topic,
-						StartOffset: m.Offset, // TODO Counts, global Labels missing here
+					fsms[fsmID] = &fsmDataPoint{
+						fsmID:       fsmID,
+						partition:   m.Partition,
+						topic:       m.Topic,
+						startOffset: m.Offset, // TODO Counts, global Labels missing here
 					}
 				}
-				fsms[fsmID].LastOffset = m.Offset
+				fsms[fsmID].lastOffset = m.Offset
 				fsms[fsmID].changed = true
 			}
 
@@ -56,7 +56,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topic, db 
 				for i := range fsms { // TODO this is very inefficient! Several connections seems to make sense here.
 					if fsms[i].changed {
 						db.saveFSM(*fsms[i])
-						fmt.Println("Saved", fsms[i].FSMID)
+						fmt.Println("Saved", fsms[i].fsmID)
 						fsms[i].changed = false
 					}
 				}
