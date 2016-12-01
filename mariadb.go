@@ -98,7 +98,13 @@ func (m *mariaDB) saveScrape(topic string, partition int32, offset int64) error 
 
 func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 	fsms := []fsm{}
-	q := `SELECT fsmID, created FROM bookie.fsm ORDER BY created DESC LIMIT ?`
+	q := `SELECT
+			f.*, t.k, t.v
+		  FROM
+		    (SELECT fsmID, created FROM bookie.fsm ORDER BY created DESC LIMIT ?) f
+		  JOIN
+		    bookie.tags t USING(fsmID)
+		  `
 
 	dbRows, err := m.db.Query(q, n)
 	if err != nil {
@@ -107,14 +113,21 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 
 	defer closeRows(dbRows)
 
+	tm := map[string]map[string]string{}
 	for dbRows.Next() {
-		var fsmID string
-		var _created string
+		var fsmID, _created, k, v string
 
-		if err = dbRows.Scan(&fsmID, &_created); err != nil {
+		if err = dbRows.Scan(&fsmID, &_created, &k, &v); err != nil {
 			log.WithFields(log.Fields{"err": err, "number": n}).Errorf("failed to get last n fsms")
 			return fsms, err
 		}
+
+		tgs, ok := tm[fsmID]
+		if !ok {
+			tgs = map[string]string{}
+		}
+		tgs[k] = v
+		tm[fsmID] = tgs
 
 		created, err := time.Parse("2006-01-02 15:04:05", _created)
 		if err != nil {
@@ -126,6 +139,11 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 			Created: created,
 		}
 		fsms = append(fsms, f)
+	}
+
+	for _, f := range fsms {
+		tgs, _ := tm[f.ID]
+		f.Tags = tgs
 	}
 
 	return fsms, nil
@@ -259,13 +277,15 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 	fsm := fsm{Topics: map[string]topic{}}
 
 	q := `SELECT
-					fsmID, o.topic, o.topic_partition, o.startOffset, o.lastOffset, f.created, o.updated, o.count, s.lastOffset
+					fsmID, o.topic, o.topic_partition, o.startOffset, o.lastOffset, f.created, o.updated, o.count, s.lastOffset, t.k, t.v
 				FROM
 					bookie.offset o
 				JOIN
-					bookie.fsm f USING(fsmId)
+					bookie.fsm f USING(fsmID)
 				JOIN
 					bookie.scrape s USING(topic, topic_partition)
+				JOIN
+				    bookie.tags t USING(fsmID)
 				WHERE
 					fsmID = ?`
 	dbRows, err := m.db.Query(q, fsmID)
@@ -276,19 +296,19 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 	defer closeRows(dbRows)
 
 	topicCounts := map[string]int64{}
-
+	tags := map[string]string{}
 	for dbRows.Next() {
-		var fsmID, topic string
+		var fsmID, topic, k, v string
 		var part int32
 		var startOffset, lastOffset, count, lastScrapedOffset int64
 		var _created, _updated string
 
-		if err = dbRows.Scan(&fsmID, &topic, &part, &startOffset, &lastOffset, &_created, &_updated, &count, &lastScrapedOffset); err != nil {
+		if err = dbRows.Scan(&fsmID, &topic, &part, &startOffset, &lastOffset, &_created, &_updated, &count, &lastScrapedOffset, &k, &v); err != nil {
 			fs["error"] = err
 			log.WithFields(fs).Errorf("failed to scan execution uuid")
 			return fsm, err
 		}
-
+		tags[k] = v
 		created, err := time.Parse("2006-01-02 15:04:05", _created)
 		if err != nil {
 			return fsm, err
@@ -314,6 +334,8 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 		}
 		topicCounts[topic] += count
 	}
+
+	fsm.Tags = tags
 
 	for t, c := range topicCounts {
 		tp := fsm.Topics[t]
