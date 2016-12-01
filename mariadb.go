@@ -98,12 +98,7 @@ func (m *mariaDB) saveScrape(topic string, partition int32, offset int64) error 
 
 func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 	fsms := []fsm{}
-	q := `SELECT
-			f.fsmID, f.created, o.topic, o.topic_partition, o.startOffset, o.lastOffset, o.count
-		  FROM
-		  		(SELECT fsmID, created FROM bookie.fsm ORDER BY created DESC LIMIT ?) f
-		  INNER JOIN
-					bookie.offset o USING (fsmID)`
+	q := `SELECT fsmID, created FROM bookie.fsm ORDER BY created DESC LIMIT ?`
 
 	dbRows, err := m.db.Query(q, n)
 	if err != nil {
@@ -112,14 +107,11 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 
 	defer closeRows(dbRows)
 
-	fsmMap := map[string]fsm{}
 	for dbRows.Next() {
-		var fsmID, topicValue string
-		var partitionValue int32
-		var startOffset, lastOffset, count int64
+		var fsmID string
 		var _created string
 
-		if err = dbRows.Scan(&fsmID, &_created, &topicValue, &partitionValue, &startOffset, &lastOffset, &count); err != nil {
+		if err = dbRows.Scan(&fsmID, &_created); err != nil {
 			log.WithFields(log.Fields{"err": err, "number": n}).Errorf("failed to get last n fsms")
 			return fsms, err
 		}
@@ -129,37 +121,10 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 			return fsms, err
 		}
 
-		f, ok := fsmMap[fsmID]
-		if !ok {
-			f = fsm{
-				ID:      fsmID,
-				Created: created,
-				Topics:  map[string]topic{},
-			}
-			fsmMap[fsmID] = f
+		f := fsm{
+			ID:      fsmID,
+			Created: created,
 		}
-
-		t, ok := f.Topics[topicValue]
-		if !ok {
-			t = topic{
-				Partitions: map[int32]partition{},
-				Count:      0,
-			}
-			f.Topics[topicValue] = t
-		}
-
-		_, ok = t.Partitions[partitionValue]
-		if !ok {
-			p := partition{
-				Start: startOffset,
-				End:   lastOffset,
-				Count: count,
-			}
-			t.Partitions[partitionValue] = p
-		}
-	}
-
-	for _, f := range fsmMap {
 		fsms = append(fsms, f)
 	}
 

@@ -36,7 +36,7 @@ type topic struct {
 }
 
 type fsm struct {
-	Topics  map[string]topic `json:"topics"`
+	Topics  map[string]topic `json:"topics,omitempty"`
 	Created time.Time        `json:"created"`
 	ID      string           `json:"id"`
 }
