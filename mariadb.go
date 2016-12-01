@@ -97,12 +97,12 @@ func (m *mariaDB) saveScrape(topic string, partition int32, offset int64) error 
 }
 
 func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
-	fsms := []fsm{}
+	fsms := []fsm{} // TODO there must be one tag or it fails
 	q := `SELECT
-			f.*, t.k, t.v
+			f.fsmID, f.created, IFNULL(t.k, "") k, IFNULL(t.v, "") v
 		  FROM
 		    (SELECT fsmID, created FROM bookie.fsm ORDER BY created DESC LIMIT ?) f
-		  JOIN
+		  LEFT JOIN
 		    bookie.tags t USING(fsmID)
 		  `
 
