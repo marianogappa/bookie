@@ -186,12 +186,13 @@ func (m *mariaDB) saveFSM(f fsmDataPoint) error {
 	}
 
 	q = `INSERT INTO bookie.offset
-				(fsmID, topic, topic_partition, startOffset, lastOffset, updated)
+				(fsmID, topic, topic_partition, startOffset, lastOffset, count, updated)
 			VALUES
-				(?, ?, ?, ?, ?, UTC_TIMESTAMP())
+				(?, ?, ?, ?, ?, ?, UTC_TIMESTAMP())
 			ON DUPLICATE KEY UPDATE
 				startOffset = ?,
 				lastOffset = ?,
+				count = ?,
 				updated = UTC_TIMESTAMP()
 			`
 
@@ -201,8 +202,10 @@ func (m *mariaDB) saveFSM(f fsmDataPoint) error {
 		f.partition,
 		f.startOffset,
 		f.lastOffset,
+		f.count,
 		f.startOffset,
 		f.lastOffset,
+		f.count,
 	)
 
 	if err != nil {
@@ -271,49 +274,73 @@ func (m *mariaDB) mustLoadScrapes() map[string]topicRecord {
 	return trs
 }
 
-func (m *mariaDB) findFSM(fsmID string) ([]FSMRow, error) {
+func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 	var (
 		err error
 		fs  = log.Fields{"fsmID": fsmID}
 	)
-	rows := []FSMRow{}
+	fsm := fsm{Topics: map[string]topic{}}
 
-	q := `SELECT fsmID, topic, topic_partition, startOffset, lastOffset, updated FROM bookie.offset WHERE fsmID = ?`
+	q := `SELECT
+					fsmID, o.topic, o.topic_partition, o.startOffset, o.lastOffset, f.created, o.updated, o.count, s.lastOffset
+				FROM
+					bookie.offset o
+				JOIN
+					bookie.fsm f USING(fsmId)
+				JOIN
+					bookie.scrape s USING(topic, topic_partition)
+				WHERE
+					fsmID = ?`
 	dbRows, err := m.db.Query(q, fsmID)
 	if err != nil {
-		return rows, err
+		return fsm, err
 	}
 
 	defer closeRows(dbRows)
 
+	topicCounts := map[string]int64{}
+
 	for dbRows.Next() {
 		var fsmID, topic string
-		var partition int32
-		var startOffset, lastOffset int64
-		var _updated string
+		var part int32
+		var startOffset, lastOffset, count, lastScrapedOffset int64
+		var _created, _updated string
 
-		if err = dbRows.Scan(&fsmID, &topic, &partition, &startOffset, &lastOffset, &_updated); err != nil {
+		if err = dbRows.Scan(&fsmID, &topic, &part, &startOffset, &lastOffset, &_created, &_updated, &count, &lastScrapedOffset); err != nil {
 			fs["error"] = err
 			log.WithFields(fs).Errorf("failed to scan execution uuid")
-			return rows, err
+			return fsm, err
 		}
 
-		updated, err := time.Parse("2006-01-02 15:04:05", _updated)
+		created, err := time.Parse("2006-01-02 15:04:05", _created)
 		if err != nil {
-			return rows, err
+			return fsm, err
 		}
 
-		rows = append(rows, FSMRow{
-			FSMID:       fsmID,
-			Topic:       topic,
-			Partition:   partition,
-			StartOffset: startOffset,
-			LastOffset:  lastOffset,
-			Updated:     updated,
-		})
+		fsm.Created = created
+		fsm.ID = fsmID
+		t, ok := fsm.Topics[topic]
+		if !ok {
+			t.Partitions = make(map[int32]partition)
+		}
+
+		t.Partitions[part] = partition{
+			Start:       startOffset,
+			End:         lastOffset,
+			LastScraped: lastScrapedOffset,
+			Count:       count,
+		}
+		fsm.Topics[topic] = t
+
+		topicCounts[topic] += count
 	}
 
-	return rows, nil
+	for t, c := range topicCounts {
+		tp := fsm.Topics[t]
+		tp.Count = c
+	}
+
+	return fsm, nil
 }
 
 func closeRows(rows *sql.Rows) {

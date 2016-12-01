@@ -17,16 +17,17 @@ type fsmDataPoint struct {
 	partition   int32
 	startOffset int64
 	lastOffset  int64
+	count       int64
 
 	changed bool
 	created time.Time
 }
 
 type partition struct {
-	Start       int64
-	End         int64
-	LastScraped int64
-	Count       int64
+	Start       int64 `json:"start"`
+	End         int64 `json:"end"`
+	LastScraped int64 `json:"lastScraped"`
+	Count       int64 `json:"count"`
 }
 
 type topic struct {

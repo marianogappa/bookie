@@ -32,12 +32,12 @@ func (h *serverHandler) fsm(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 	}
 
-	fsms, err := h.db.findFSM(fsmID)
+	fsm, err := h.db.findFSM(fsmID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	byts, err := json.Marshal(fsms)
+	byts, err := json.Marshal(fsm)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
