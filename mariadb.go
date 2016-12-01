@@ -297,12 +297,16 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 		}
 		fsm.Topics[topic] = t
 
+		if _, ok := topicCounts[topic]; !ok {
+			topicCounts[topic] = 0
+		}
 		topicCounts[topic] += count
 	}
 
 	for t, c := range topicCounts {
 		tp := fsm.Topics[t]
 		tp.Count = c
+		fsm.Topics[t] = tp
 	}
 
 	return fsm, nil
