@@ -140,15 +140,15 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 				ID:      fsmID,
 				Created: created,
 			}
-			fsmMap[fsmID] = f
 		}
 
 		ts := f.Tags
 		if ts == nil {
-			ts := map[string]string{}
-			f.Tags = ts
+			ts = map[string]string{}
 		}
 		ts[k] = v
+		f.Tags = ts
+		fsmMap[fsmID] = f
 	}
 
 	for _, v := range fsmMap {
