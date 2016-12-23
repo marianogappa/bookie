@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS bookie.scrape (
 
 CREATE TABLE IF NOT EXISTS bookie.fsm (
     fsmID varchar(100) NOT NULL,
-    created datetime DEFAULT NULL,
+    created datetime NOT NULL,
     PRIMARY KEY (fsmID)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
