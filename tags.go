@@ -29,11 +29,11 @@ func (t *tags) flush() (string, []interface{}) {
 	t.t = nil
 
 	return `INSERT INTO bookie.tags(fsmID, k, v) VALUES ` +
-		t.buildInsertTuples(len(vs)/3, 3) +
+		buildInsertTuples(3, len(vs)/3) +
 		` ON DUPLICATE KEY UPDATE v = VALUES(v)`, vs
 }
 
-func (t tags) buildInsertTuples(colN, rowN int) string {
+func buildInsertTuples(colN, rowN int) string {
 	s := bytes.NewBuffer([]byte{})
 	for i := 1; i <= rowN; i++ {
 		s.Write([]byte("("))
