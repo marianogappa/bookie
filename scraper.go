@@ -90,11 +90,14 @@ func mustFlush(fsms *fsms, tags *tags, offsets *offsets, m message, db *mariaDB)
 	qs = append(qs, db.saveScrape(m.Topic, m.Partition, m.Offset))
 
 	db.mustRunTransaction(qs)
-	log.WithFields(log.Fields{
-		"topic":      m.Topic,
-		"partition":  m.Partition,
-		"lastOffset": m.Offset,
-	}).Info("Persisted batch.")
+
+	if *verbose {
+		log.WithFields(log.Fields{
+			"topic":      m.Topic,
+			"partition":  m.Partition,
+			"lastOffset": m.Offset,
+		}).Info("Persisted batch.")
+	}
 }
 
 func newMessage(cm sarama.ConsumerMessage) (message, error) {

@@ -6,6 +6,7 @@ import (
 )
 
 var wipe = flag.Bool("wipe", false, "wipe out all stored data and start from scratch")
+var verbose = flag.Bool("v", false, "verbose")
 
 func main() {
 	flag.Parse()
