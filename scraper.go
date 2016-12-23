@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"math"
 	"strings"
 	"time"
 
@@ -26,7 +25,8 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 	var err error
 
 	timeInterval := 5 * time.Second
-	offsetInterval := 2500
+	offsetInterval := int64(2500)
+	lastOffset := int64(0)
 	timer := time.NewTimer(timeInterval)
 
 	for {
@@ -54,17 +54,23 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 
 			// TODO persist aliases
 
-			if math.Mod(float64(m.Offset), float64(offsetInterval)) == float64(0) {
+			if lastOffset == 0 {
+				lastOffset = m.Offset
+			}
+
+			if m.Offset-lastOffset >= offsetInterval {
 				mustFlush(&fsms, &tags, &offsets, m, db)
 				if !timer.Stop() {
 					<-timer.C
 				}
 				timer.Reset(timeInterval)
+				lastOffset = m.Offset
 			}
 		case <-timer.C:
 			if m.Offset > 0 {
 				mustFlush(&fsms, &tags, &offsets, m, db)
 				timer.Reset(timeInterval)
+				lastOffset = m.Offset
 			}
 		}
 	}
@@ -84,6 +90,11 @@ func mustFlush(fsms *fsms, tags *tags, offsets *offsets, m message, db *mariaDB)
 	qs = append(qs, db.saveScrape(m.Topic, m.Partition, m.Offset))
 
 	db.mustRunTransaction(qs)
+	log.WithFields(log.Fields{
+		"topic":      m.Topic,
+		"partition":  m.Partition,
+		"lastOffset": m.Offset,
+	}).Info("Persisted batch.")
 }
 
 func newMessage(cm sarama.ConsumerMessage) (message, error) {
