@@ -23,15 +23,15 @@ type query struct {
 	values []interface{}
 }
 
-func mustSetupMariaDB(config mariadbConfig) *mariaDB {
-	db, err := setupMariaDB(config)
+func mustSetupMariaDB(config mariadbConfig, wipe bool) *mariaDB {
+	db, err := setupMariaDB(config, wipe)
 	if err != nil {
 		log.WithFields(log.Fields{"err": err}).Fatal("Could not setup MariaDB.")
 	}
 	return db
 }
 
-func setupMariaDB(conf mariadbConfig) (*mariaDB, error) {
+func setupMariaDB(conf mariadbConfig, wipe bool) (*mariaDB, error) {
 	db, err := sql.Open("mysql", conf.URL)
 	if err != nil {
 		return nil, err
@@ -42,6 +42,11 @@ func setupMariaDB(conf mariadbConfig) (*mariaDB, error) {
 	}
 
 	log.Infof("Set up MariaDB connection for %#v.", conf.URL)
+
+	if wipe {
+		log.Info("Wipe out all stored data if exists...")
+		mustRunQuery(db, "DROP SCHEMA IF EXISTS bookie")
+	}
 
 	mustRunMariaDBSQL(db)
 
