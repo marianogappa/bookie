@@ -21,7 +21,11 @@ func (f *fsms) add(fsmId string, created string, layout string) {
 	}
 }
 
-func (f *fsms) flush() (string, []interface{}) {
+func (f *fsms) flush() *query {
+	if len(f.t) == 0 {
+		return nil
+	}
+
 	vs := make([]interface{}, len(f.t)*2)
 	i := 0
 	for fsmId, tm := range f.t {
@@ -33,9 +37,12 @@ func (f *fsms) flush() (string, []interface{}) {
 
 	f.t = nil
 
-	return `INSERT INTO bookie.fsm(fsmID, created) VALUES ` +
-		buildInsertTuples(2, len(vs)/2) +
-		` ON DUPLICATE KEY UPDATE created = LEAST(created, VALUES(created))`, vs
+	return &query{
+		`INSERT INTO bookie.fsm(fsmID, created) VALUES ` +
+			buildInsertTuples(2, len(vs)/2) +
+			` ON DUPLICATE KEY UPDATE created = LEAST(created, VALUES(created))`,
+		vs,
+	}
 }
 
 func (f fsms) parseTime(t string, layout string) time.Time {

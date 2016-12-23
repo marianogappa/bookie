@@ -18,7 +18,11 @@ func (t *tags) add(fsmId string, k string, v string) {
 	t.t[fsmId][k] = v
 }
 
-func (t *tags) flush() (string, []interface{}) {
+func (t *tags) flush() *query {
+	if len(t.t) == 0 {
+		return nil
+	}
+
 	vs := []interface{}{}
 	for fsmId, aux := range t.t {
 		for k, v := range aux {
@@ -28,9 +32,12 @@ func (t *tags) flush() (string, []interface{}) {
 
 	t.t = nil
 
-	return `INSERT INTO bookie.tags(fsmID, k, v) VALUES ` +
-		buildInsertTuples(3, len(vs)/3) +
-		` ON DUPLICATE KEY UPDATE v = VALUES(v)`, vs
+	return &query{
+		sql: `INSERT INTO bookie.tags(fsmID, k, v) VALUES ` +
+			buildInsertTuples(3, len(vs)/3) +
+			` ON DUPLICATE KEY UPDATE v = VALUES(v)`,
+		values: vs,
+	}
 }
 
 func buildInsertTuples(colN, rowN int) string {

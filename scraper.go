@@ -2,9 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
-	"strconv"
 	"strings"
 	"time"
 
@@ -20,82 +18,72 @@ func scrape(k cluster, kt map[string]topicConfig, db *mariaDB) {
 }
 
 func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfig, db *mariaDB) {
-	// TODO can't be 100% on memory
-	// TODO has to be populated on startup or lazily, but if empty it will calculate incorrect StartOffsets and Counts
-	fsms := map[string]*fsmDataPoint{}
+	fsms := fsms{}
+	tags := tags{}
+	offsets := offsets{}
+	fsmIDAliases := map[string]string{} // TODO use aliases
+	m := message{}
+	var err error
+
+	timeInterval := 5 * time.Second
+	offsetInterval := 2500
+	timer := time.NewTimer(timeInterval)
 
 	for {
 		select {
 		case cm := <-ch:
-			m, err := newMessage(*cm)
+			m, err = newMessage(*cm)
 			if err != nil {
 				log.WithFields(log.Fields{"err": err, "message": m}).Warn("Could not unmarshal message.")
+				continue
 			}
 
-			fsmIDAliases := map[string]string{} // TODO this has to be global to all scrapers
 			fsmID, fsmTags, err := processMessage(m, kt, fsmIDAliases)
 			if err != nil {
 				log.WithFields(log.Fields{"err": err, "message": m}).Warn("Could not process message.")
+				continue
 			}
 
-			if len(fsmID) > 0 {
-				_, ok := fsms[fsmID]
-				if !ok {
-					fsms[fsmID] = &fsmDataPoint{
-						fsmID:       fsmID,
-						partition:   m.Partition,
-						topic:       m.Topic,
-						startOffset: m.Offset, // TODO Counts, global Labels missing here
-						count:       int64(0),
-						tags:        map[string]string{},
-					}
-				}
-				fsms[fsmID].lastOffset = m.Offset
-				fsms[fsmID].count++
-				fsms[fsmID].changed = true
-
-				for k, v := range fsmTags {
-					if len(k) > 0 && len(v) > 0 {
-						fsms[fsmID].tags[k] = v
-					}
-				}
-
-				if _created, ok := fsms[fsmID].tags["created"]; ok {
-					var err error
-					var _icreated int64
-					var created time.Time
-
-					if kt[m.Topic].TimeLayout == "unix" {
-						_icreated, err = strconv.ParseInt(_created, 10, 64)
-						created = time.Unix(_icreated, 0)
-					} else if kt[m.Topic].TimeLayout == "unixNano" {
-						_icreated, err = strconv.ParseInt(_created, 10, 64)
-						created = time.Unix(0, _icreated)
-					} else {
-						created, err = time.Parse(kt[m.Topic].TimeLayout, _created)
-					}
-
-					if err == nil {
-						fsms[fsmID].created = created
-					}
+			fsms.add(fsmID, fsmTags["created"], kt[m.Topic].TimeLayout)
+			for k, v := range fsmTags {
+				if len(k) > 0 && len(v) > 0 {
+					tags.add(fsmID, k, v)
 				}
 			}
+			offsets.add(fsmID, m.Topic, m.Partition, m.Offset)
 
-			// TODO persisting aliases
+			// TODO persist aliases
 
-			if math.Mod(float64(m.Offset), 1000) == float64(0) { // TODO this is pointless if we don't populate fsms to current snapshot on startup
-				for i := range fsms { // TODO this is very inefficient! Several connections seems to make sense here.
-					if fsms[i].changed {
-						db.saveFSM(*fsms[i])
-						fmt.Println("Saved", fsms[i].fsmID)
-						fsms[i].changed = false
-					}
+			if math.Mod(float64(m.Offset), float64(offsetInterval)) == float64(0) {
+				mustFlush(&fsms, &tags, &offsets, m, db)
+				if !timer.Stop() {
+					<-timer.C
 				}
-
-				db.saveScrape(m.Topic, m.Partition, m.Offset)
+				timer.Reset(timeInterval)
+			}
+		case <-timer.C:
+			if m.Offset > 0 {
+				mustFlush(&fsms, &tags, &offsets, m, db)
+				timer.Reset(timeInterval)
 			}
 		}
 	}
+}
+
+func mustFlush(fsms *fsms, tags *tags, offsets *offsets, m message, db *mariaDB) {
+	qs := []query{}
+	if q := fsms.flush(); q != nil {
+		qs = append(qs, *q)
+	}
+	if q := tags.flush(); q != nil {
+		qs = append(qs, *q)
+	}
+	if q := offsets.flush(); q != nil {
+		qs = append(qs, *q)
+	}
+	qs = append(qs, db.saveScrape(m.Topic, m.Partition, m.Offset))
+
+	db.mustRunTransaction(qs)
 }
 
 func newMessage(cm sarama.ConsumerMessage) (message, error) {

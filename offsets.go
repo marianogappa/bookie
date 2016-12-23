@@ -48,7 +48,11 @@ func (o *offsets) add(fsmId string, topic string, topic_partition int32, offset 
 	}
 }
 
-func (o *offsets) flush() (string, []interface{}) {
+func (o *offsets) flush() *query {
+	if len(o.o) == 0 {
+		return nil
+	}
+
 	vs := []interface{}{}
 	for fsmId, aux := range o.o {
 		for topic, aux2 := range aux {
@@ -60,7 +64,10 @@ func (o *offsets) flush() (string, []interface{}) {
 
 	o.o = nil
 
-	return `INSERT INTO bookie.offset(fsmID, topic, topic_partition, startOffset, lastOffset, count, updated) VALUES ` +
-		buildInsertTuples(7, len(vs)/7) +
-		` ON DUPLICATE KEY UPDATE lastOffset = VALUES(lastOffset), count = count + VALUES(count), updated = UTC_TIMESTAMP)`, vs
+	return &query{
+		sql: `INSERT INTO bookie.offset(fsmID, topic, topic_partition, startOffset, lastOffset, count, updated) VALUES ` +
+			buildInsertTuples(7, len(vs)/7) +
+			` ON DUPLICATE KEY UPDATE lastOffset = VALUES(lastOffset), count = count + VALUES(count), updated = UTC_TIMESTAMP`,
+		values: vs,
+	}
 }
