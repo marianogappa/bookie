@@ -106,19 +106,18 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 		    bookie.tags t USING(fsmID)
 		  `
 
-	dbRows, err := m.db.Query(q, n)
+	rows, err := m.db.Query(q, n)
 	if err != nil {
 		return fsms, err
 	}
-
-	defer closeRows(dbRows)
+	defer rows.Close()
 
 	tm := map[string]map[string]string{}
 	fsmMap := map[string]fsm{}
-	for dbRows.Next() {
+	for rows.Next() {
 		var fsmID, _created, k, v string
 
-		if err = dbRows.Scan(&fsmID, &_created, &k, &v); err != nil {
+		if err = rows.Scan(&fsmID, &_created, &k, &v); err != nil {
 			log.WithFields(log.Fields{"err": err, "number": n}).Errorf("failed to get last n fsms")
 			return fsms, err
 		}
@@ -253,17 +252,18 @@ func (m *mariaDB) mustLoadScrapes() map[string]topicRecord {
 	trs := map[string]topicRecord{}
 
 	q := `SELECT topic, topic_partition, lastOffset FROM bookie.scrape`
-	dbRows, err := m.db.Query(q)
+	rows, err := m.db.Query(q)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer rows.Close()
 
-	for dbRows.Next() {
+	for rows.Next() {
 		var topic string
 		var partition int32
 		var lastOffset int64
 
-		if err = dbRows.Scan(&topic, &partition, &lastOffset); err != nil {
+		if err = rows.Scan(&topic, &partition, &lastOffset); err != nil {
 			log.Fatal(err)
 		}
 		if _, ok := trs[topic]; !ok {
@@ -295,21 +295,20 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 					bookie.scrape s USING(topic, topic_partition)
 				WHERE
 					fsmID = ?`
-	dbRows, err := m.db.Query(q, fsmID)
+	rows, err := m.db.Query(q, fsmID)
 	if err != nil {
 		return fsm, err
 	}
-
-	defer closeRows(dbRows)
+	defer rows.Close()
 
 	topicCounts := map[string]int64{}
-	for dbRows.Next() {
+	for rows.Next() {
 		var fsmID, topic string
 		var part int32
 		var startOffset, lastOffset, count, lastScrapedOffset int64
 		var _created, _updated string
 
-		if err = dbRows.Scan(&fsmID, &topic, &part, &startOffset, &lastOffset, &_created, &_updated, &count, &lastScrapedOffset); err != nil {
+		if err = rows.Scan(&fsmID, &topic, &part, &startOffset, &lastOffset, &_created, &_updated, &count, &lastScrapedOffset); err != nil {
 			fs["error"] = err
 			log.WithFields(fs).Errorf("failed to scan fsm")
 			return fsm, err
@@ -347,14 +346,16 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 	}
 
 	q = `SELECT k, v FROM bookie.tags WHERE fsmID = ?`
-	dbRows, err = m.db.Query(q, fsmID)
+	rows, err = m.db.Query(q, fsmID)
 	if err != nil {
 		return fsm, err
 	}
+	defer rows.Close()
+
 	tags := map[string]string{}
-	for dbRows.Next() {
+	for rows.Next() {
 		var k, v string
-		if err = dbRows.Scan(&k, &v); err != nil {
+		if err = rows.Scan(&k, &v); err != nil {
 			fs["error"] = err
 			log.WithFields(fs).Errorf("failed to scan tags")
 			return fsm, err
@@ -364,10 +365,4 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 	fsm.Tags = tags
 
 	return fsm, nil
-}
-
-func closeRows(rows *sql.Rows) {
-	if err := rows.Close(); err != nil {
-		log.WithField("error", err).Error("failed to close rows")
-	}
 }
