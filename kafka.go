@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/Shopify/sarama"
+	log "github.com/Sirupsen/logrus"
 )
 
 type cluster struct {
@@ -78,7 +78,7 @@ func (c *cluster) addTopic(tr topicRecord) error {
 
 		c.addPartitionConsumer(partitionConsumer)
 		c.addCh(partitionConsumer.Messages())
-		log.Printf("Consuming topic [%v], partition [%v] from offset [%v]", topic, partition, offset)
+		log.WithFields(log.Fields{"topic": topic, "partition": partition, "offset": offset}).Info("Consuming.")
 	}
 
 	return nil
