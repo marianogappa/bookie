@@ -3,14 +3,14 @@ Indexing for Kafka queues.
 
 [Movio Hackathon video explaining Bookie](https://www.youtube.com/watch?v=VVOk96cZW20)
 
-# Installation
+## Installation
 
 ```
 go get -u github.com/MarianoGappa/bookie
 ```
 or get the [latest release binary](https://github.com/MarianoGappa/bookie/releases) for your OS
 
-# Configuration
+## Configuration
 
 ```
 {
@@ -31,7 +31,7 @@ or get the [latest release binary](https://github.com/MarianoGappa/bookie/releas
 }
 ```
 
-# Starting
+## Starting
 
 ```
 $ bookie
@@ -42,6 +42,6 @@ INFO[2016-12-24T13:04:20.859] Serving snitch.                               addr
 INFO[2016-12-24T13:04:20.859] Serving bookie.                               address=0.0.0.0:52345
 ```
 
-# API
+## API
 
 TODO
