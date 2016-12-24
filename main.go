@@ -12,6 +12,7 @@ func main() {
 	flag.Parse()
 
 	config := mustReadConfig()
+	setupLogFormatter(config)
 	db := mustSetupMariaDB(config.Mariadb, *wipe)
 	scrapes := db.mustLoadScrapes()
 	kafka := mustSetupCluster(config.Kafka, scrapes)

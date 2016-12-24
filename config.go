@@ -20,6 +20,7 @@ type config struct {
 	ServerPort int           `json:"serverPort"`
 	Mariadb    mariadbConfig `json:"mariadb"`
 	Kafka      kafkaConfig   `json:"kafka"`
+	LogFormat  string        `json:"logFormat"`
 }
 
 type topicConfig struct {
