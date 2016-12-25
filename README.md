@@ -44,4 +44,54 @@ INFO[2016-12-24T13:04:20.859] Serving bookie.                               addr
 
 ## API
 
-TODO
+* Last n FSMs
+```
+$ curl -s localhost:52345/latest?n=3 | jq
+[
+  {
+    "tags": {
+      "created": "2012-12-20"
+    },
+    "created": "2012-12-20T00:00:00Z",
+    "id": "Nutcracker_3D:_Mariisky_Theatre_2012"
+  },
+  {
+    "tags": {
+      "created": "2012-12-20"
+    },
+    "created": "2012-12-20T00:00:00Z",
+    "id": "From_Up_On_Poppy_Hill"
+  },
+  {
+    "tags": {
+      "created": "2012-12-23"
+    },
+    "created": "2012-12-23T00:00:00Z",
+    "id": "The_Lord_Of_The_Rings_Trilogy"
+  }
+]
+```
+
+* Offset info for a particular FSM by id
+```
+$ curl -s localhost:52345/fsm?id=The_Lord_Of_The_Rings_Trilogy | jq
+{
+  "topics": {
+    "movies": {
+      "partitions": {
+        "0": {
+          "start": 37120,
+          "end": 37123,
+          "lastScraped": 46362,
+          "count": 4
+        }
+      },
+      "count": 4
+    }
+  },
+  "tags": {
+    "created": "2012-12-23"
+  },
+  "created": "2012-12-23T00:00:00Z",
+  "id": "The_Lord_Of_The_Rings_Trilogy"
+}
