@@ -67,7 +67,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 				lastOffset = m.Offset
 			}
 		case <-timer.C:
-			if m.Offset > 0 {
+			if m.Offset > 0 && m.Offset > lastOffset {
 				mustFlush(&fsms, &tags, &offsets, m, db)
 				timer.Reset(timeInterval)
 				lastOffset = m.Offset
