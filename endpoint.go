@@ -30,16 +30,19 @@ func (h *serverHandler) fsm(w http.ResponseWriter, r *http.Request) {
 
 	if fsmID == "" {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 
 	fsm, err := h.db.findFSM(fsmID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	byts, err := json.Marshal(fsm)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	_, err = w.Write(byts)
@@ -53,21 +56,25 @@ func (h *serverHandler) latest(w http.ResponseWriter, r *http.Request) {
 
 	if ns == "" {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+		return
 	}
 
 	n, err := strconv.Atoi(ns)
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
 	}
 
 	fsms, err := h.db.getLastNFSMs(n)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	byts, err := json.Marshal(fsms)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	_, err = w.Write(byts)
