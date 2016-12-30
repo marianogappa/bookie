@@ -11,8 +11,9 @@ type mariadbConfig struct {
 }
 
 type kafkaConfig struct {
-	Brokers string                 `json:"brokers"`
-	Topics  map[string]topicConfig `json:"topics"`
+	Brokers       string                 `json:"brokers"`
+	Topics        map[string]topicConfig `json:"topics"`
+	BootstrapFrom int64                  `json:"bootstrapFrom"`
 }
 
 type config struct {

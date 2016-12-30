@@ -57,7 +57,7 @@ type topicRecord struct {
 	partitions map[int32]int64
 }
 
-func (c *cluster) addTopic(tr topicRecord) error {
+func (c *cluster) addTopic(tr topicRecord, bootstrapFrom int64) error {
 	client, consumer, brokers, topic := c.client, c.consumer, c.brokers, tr.topic
 
 	partitions, err := resolvePartitions(topic, consumer)
@@ -66,7 +66,7 @@ func (c *cluster) addTopic(tr topicRecord) error {
 	}
 
 	for _, partition := range partitions {
-		offset, err := resolveOffset(topic, partition, tr.partitions[partition], client)
+		offset, err := resolveOffset(topic, partition, tr.partitions[partition], bootstrapFrom, client)
 		if err != nil {
 			return fmt.Errorf("Could not resolve offset for %v, %v, %v. err=%v", brokers, topic, partition, err)
 		}
@@ -109,7 +109,7 @@ func mustSetupCluster(conf kafkaConfig, scrapes map[string]topicRecord) cluster 
 	}
 
 	for _, tr := range scrapes {
-		c.addTopic(tr)
+		c.addTopic(tr, conf.BootstrapFrom)
 	}
 
 	return c
@@ -123,14 +123,10 @@ func resolvePartitions(topic string, consumer sarama.Consumer) ([]int32, error) 
 	return partitions, nil
 }
 
-func resolveOffset(topic string, partition int32, candidateOffset int64, client sarama.Client) (int64, error) {
+func resolveOffset(topic string, partition int32, candidateOffset, bootstrapFrom int64, client sarama.Client) (int64, error) {
 	oldest, err := client.GetOffset(topic, partition, sarama.OffsetOldest)
 	if err != nil {
 		return 0, err
-	}
-
-	if candidateOffset <= 0 {
-		return oldest, nil
 	}
 
 	newest, err := client.GetOffset(topic, partition, sarama.OffsetNewest)
@@ -138,9 +134,38 @@ func resolveOffset(topic string, partition int32, candidateOffset int64, client 
 		return 0, err
 	}
 
+	if candidateOffset <= 0 {
+		if bootstrapFrom == 0 || bootstrapFrom == sarama.OffsetOldest {
+			return oldest, nil
+		}
+		if bootstrapFrom == sarama.OffsetNewest {
+			return newest, nil
+		}
+		if bootstrapFrom < 0 {
+			return max(newest+bootstrapFrom, oldest), nil
+		}
+		if bootstrapFrom > 0 {
+			return min(bootstrapFrom, newest), nil
+		}
+	}
+
 	if candidateOffset >= oldest && candidateOffset <= newest {
 		return candidateOffset, nil
 	}
 
 	return 0, fmt.Errorf("Invalid value for consumer offset")
+}
+
+func max(a, b int64) int64 {
+	if b > a {
+		return b
+	}
+	return a
+}
+
+func min(a, b int64) int64 {
+	if b < a {
+		return b
+	}
+	return a
 }
