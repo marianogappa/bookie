@@ -1,21 +1,27 @@
 package main
 
-import "bytes"
+import (
+	"bytes"
+	"strings"
+)
 
 type tags struct {
 	t map[string]map[string]string
 }
 
-func (t *tags) add(fsmId string, k string, v string) {
+func (t *tags) add(fsmId, fsmAlias, k, v string) {
+
 	if t.t == nil {
 		t.t = map[string]map[string]string{}
 	}
 
-	if _, ok := t.t[fsmId]; !ok {
-		t.t[fsmId] = map[string]string{k: v}
+	key := concatKeys(fsmId, fsmAlias)
+
+	if _, ok := t.t[key]; !ok {
+		t.t[key] = map[string]string{k: v}
 		return
 	}
-	t.t[fsmId][k] = v
+	t.t[key][k] = v
 }
 
 func (t *tags) flush() *query {
@@ -24,17 +30,18 @@ func (t *tags) flush() *query {
 	}
 
 	vs := []interface{}{}
-	for fsmId, aux := range t.t {
+	for key, aux := range t.t {
 		for k, v := range aux {
-			vs = append(vs, fsmId, k, v)
+			fsmID, fsmAlias := extractKeys(key)
+			vs = append(vs, fsmID, fsmAlias, k, v)
 		}
 	}
 
 	t.t = nil
 
 	return &query{
-		sql: `INSERT INTO bookie.tags(fsmID, k, v) VALUES ` +
-			buildInsertTuples(3, len(vs)/3) +
+		sql: `INSERT INTO bookie.tags(fsmID, fsmAlias, k, v) VALUES ` +
+			buildInsertTuples(4, len(vs)/4) +
 			` ON DUPLICATE KEY UPDATE v = VALUES(v)`,
 		values: vs,
 	}
@@ -56,4 +63,13 @@ func buildInsertTuples(colN, rowN int) string {
 		}
 	}
 	return s.String()
+}
+
+func concatKeys(a, b string) string { // TODO JSON Marshal/Unmarshal is safer, but slower. Do we care?
+	return a + "@@separator@@" + b
+}
+
+func extractKeys(s string) (string, string) {
+	ks := strings.Split(s, "@@separator@@")
+	return ks[0], ks[1]
 }

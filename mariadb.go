@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"io/ioutil"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -16,6 +17,7 @@ var (
 
 type mariaDB struct {
 	db *sql.DB
+	m  sync.Mutex
 }
 
 type query struct {
@@ -52,7 +54,7 @@ func setupMariaDB(conf mariadbConfig, wipe bool) (*mariaDB, error) {
 
 	log.Infof("Initialize schema and tables")
 
-	return &mariaDB{db}, nil
+	return &mariaDB{db: db}, nil
 }
 
 func mustRunMariaDBSQL(db *sql.DB) {
@@ -76,6 +78,9 @@ func mustRunQuery(db *sql.DB, sql string) {
 }
 
 func (m *mariaDB) mustRunTransaction(qs []query) {
+	m.m.Lock()
+	defer m.m.Unlock()
+
 	tx, err := m.db.Begin()
 	if err != nil {
 		log.WithField("err", err).Fatal("Could not begin transaction.")
@@ -86,7 +91,7 @@ func (m *mariaDB) mustRunTransaction(qs []query) {
 			if err2 := tx.Rollback(); err2 != nil {
 				log.WithField("err", err2).Error("Could not rollback transaction!")
 			}
-			log.WithFields(log.Fields{"query": qs[i], "err": err}).Fatal("Could not exec query.")
+			log.WithFields(log.Fields{"query": qs[i].sql, "values": qs[i].values, "err": err}).Fatal("Could not exec query.")
 		}
 	}
 
@@ -109,6 +114,20 @@ func (m *mariaDB) saveScrape(topic string, partition int32, offset int64) query 
 					updated = UTC_TIMESTAMP()
 				`,
 		values: []interface{}{topic, partition, offset + 1, offset + 1},
+	}
+}
+
+func (m *mariaDB) updateAliases() []query {
+	return []query{
+		{
+			sql: `UPDATE IGNORE bookie.tags t JOIN bookie.fsmAliases a USING (fsmAlias) SET t.fsmAlias = "", t.fsmID = a.fsmID WHERE t.fsmID = "" AND t.fsmAlias != ""`,
+		},
+		{
+			sql: `UPDATE IGNORE bookie.offset t JOIN bookie.fsmAliases a USING (fsmAlias) SET t.fsmAlias = "", t.fsmID = a.fsmID WHERE t.fsmID = "" AND t.fsmAlias != ""`,
+		},
+		{
+			sql: `UPDATE IGNORE bookie.fsm t JOIN bookie.fsmAliases a USING (fsmAlias) SET t.fsmAlias = "", t.fsmID = a.fsmID WHERE t.fsmID = "" AND t.fsmAlias != ""`,
+		},
 	}
 }
 
@@ -172,27 +191,6 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 
 	return fsms, nil
 }
-
-// func (m *mariaDB) saveAlias(fsmID string, fsmAlias string) error {
-// 	q := `INSERT INTO bookie.fsmAliases(fsmID, fsmAlias) (?, ?) ON DUPLICATE KEY UPDATE 1 = 1`
-
-// 	_, err := m.db.Exec(q,
-// 		fsmID,
-// 		fsmAlias,
-// 	)
-
-// 	if err != nil {
-// 		fs := log.Fields{
-// 			"fsmID":    fsmID,
-// 			"fsmAlias": fsmAlias,
-// 			"err":      err,
-// 		}
-// 		log.WithFields(fs).Error("Failed to save FSM alias")
-// 		return err
-// 	}
-
-// 	return nil
-// }
 
 func (m *mariaDB) mustLoadScrapes() map[string]topicRecord {
 	trs := map[string]topicRecord{}

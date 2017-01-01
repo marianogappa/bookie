@@ -9,15 +9,16 @@ type fsms struct {
 	t map[string]time.Time
 }
 
-func (f *fsms) add(fsmId string, created string, layout string) {
+func (f *fsms) add(fsmId string, fsmAlias string, created string, layout string) {
 	if f.t == nil {
 		f.t = map[string]time.Time{}
 	}
 
+	key := concatKeys(fsmId, fsmAlias)
 	tm := f.parseTime(created, layout)
 
-	if _, ok := f.t[fsmId]; !ok || f.t[fsmId].After(tm) {
-		f.t[fsmId] = tm
+	if _, ok := f.t[key]; !ok || f.t[key].After(tm) {
+		f.t[key] = tm
 	}
 }
 
@@ -26,10 +27,13 @@ func (f *fsms) flush() *query {
 		return nil
 	}
 
-	vs := make([]interface{}, len(f.t)*2)
+	vs := make([]interface{}, len(f.t)*3)
 	i := 0
-	for fsmId, tm := range f.t {
+	for key, tm := range f.t {
+		fsmId, fsmAlias := extractKeys(key)
 		vs[i] = fsmId
+		i++
+		vs[i] = fsmAlias
 		i++
 		vs[i] = tm
 		i++
@@ -38,8 +42,8 @@ func (f *fsms) flush() *query {
 	f.t = nil
 
 	return &query{
-		`INSERT INTO bookie.fsm(fsmID, created) VALUES ` +
-			buildInsertTuples(2, len(vs)/2) +
+		`INSERT INTO bookie.fsm(fsmID, fsmAlias, created) VALUES ` +
+			buildInsertTuples(3, len(vs)/3) +
 			` ON DUPLICATE KEY UPDATE created = LEAST(created, VALUES(created))`,
 		vs,
 	}

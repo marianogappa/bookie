@@ -2,43 +2,36 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"text/template"
 
 	log "github.com/Sirupsen/logrus"
 )
 
-func processMessage(m message, kt map[string]topicConfig, fsmIDAliases map[string]string) (string, map[string]string, error) {
+func processMessage(m message, kt map[string]topicConfig) (string, string, map[string]string, error) {
 	tags := map[string]string{}
 
 	topicDef, ok := kt[m.Topic]
 	if !ok {
 		log.WithFields(log.Fields{"topic": m.Topic}).Warn("Processed message from unknown topic")
-		return "", tags, nil
+		return "", "", tags, nil
 	}
 
 	bFSMId, err := parseTempl(topicDef.FSMID, m)
 	if err != nil {
-		return "", tags, err
+		return "", "", tags, err
 	}
 	bFSMIdAlias, err := parseTempl(topicDef.FSMIDAlias, m)
 	if err != nil {
-		return "", tags, err
+		return "", "", tags, err
 	}
 
-	if len(bFSMId) == 0 {
-		return "", tags, nil
+	if len(bFSMId) == 0 && len(bFSMIdAlias) == 0 {
+		return "", "", tags, fmt.Errorf("Empty fsmID and fsmIDAlias.")
 	}
 
 	fsmID := string(bFSMId)
 	fsmIDAlias := string(bFSMIdAlias)
-	if fa, ok := fsmIDAliases[fsmID]; len(fa) > 0 && ok {
-		fsmID = fa
-	}
-	if _, ok := fsmIDAliases[fsmIDAlias]; !ok && len(fsmIDAlias) > 0 && len(fsmID) > 0 { // if new id/alias pair
-		fsmIDAliases[fsmIDAlias] = fsmID // save new alias definition
-
-		// TODO Process incomplete events if any
-	}
 
 	if td := kt[m.Topic].Tags; len(td) > 0 {
 		for k, v := range td {
@@ -49,7 +42,7 @@ func processMessage(m message, kt map[string]topicConfig, fsmIDAliases map[strin
 		}
 	}
 
-	return fsmID, tags, nil
+	return fsmID, fsmIDAlias, tags, nil
 }
 
 func parseTempl(s string, m message) ([]byte, error) {
@@ -59,9 +52,14 @@ func parseTempl(s string, m message) ([]byte, error) {
 	}
 
 	var b bytes.Buffer
-	if err := t.Execute(&b, m); err != nil {
+	if err := t.Option("missingkey=zero").Execute(&b, m); err != nil {
 		return []byte{}, err
 	}
 
-	return b.Bytes(), nil
+	byt := b.Bytes()
+	if string(byt) == "<no value>" { // missingkey=zero doesn't work with index :(
+		return []byte{}, nil
+	}
+
+	return byt, nil
 }

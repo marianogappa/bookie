@@ -20,7 +20,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 	fsms := fsms{}
 	tags := tags{}
 	offsets := offsets{}
-	fsmIDAliases := map[string]string{} // TODO use aliases
+	aliases := aliases{}
 	m := message{}
 	var err error
 
@@ -38,28 +38,29 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 				continue
 			}
 
-			fsmID, fsmTags, err := processMessage(m, kt, fsmIDAliases)
+			fsmID, fsmAlias, fsmTags, err := processMessage(m, kt)
 			if err != nil {
 				log.WithFields(log.Fields{"err": err, "message": m}).Warn("Could not process message.")
 				continue
 			}
 
-			fsms.add(fsmID, fsmTags["created"], kt[m.Topic].TimeLayout)
+			fsms.add(fsmID, fsmAlias, fsmTags["created"], kt[m.Topic].TimeLayout)
 			for k, v := range fsmTags {
 				if len(k) > 0 && len(v) > 0 {
-					tags.add(fsmID, k, v)
+					tags.add(fsmID, fsmAlias, k, v)
 				}
 			}
-			offsets.add(fsmID, m.Topic, m.Partition, m.Offset)
-
-			// TODO persist aliases
+			offsets.add(fsmID, fsmAlias, m.Topic, m.Partition, m.Offset)
+			if len(fsmID) > 0 && len(fsmAlias) > 0 {
+				aliases.add(fsmID, fsmAlias)
+			}
 
 			if lastOffset == 0 {
 				lastOffset = m.Offset
 			}
 
 			if m.Offset-lastOffset >= offsetInterval {
-				mustFlush(&fsms, &tags, &offsets, m, db)
+				mustFlush(&fsms, &tags, &offsets, &aliases, m, db)
 				if !timer.Stop() {
 					<-timer.C
 				}
@@ -68,7 +69,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 			}
 		case <-timer.C:
 			if m.Offset > 0 && m.Offset > lastOffset {
-				mustFlush(&fsms, &tags, &offsets, m, db)
+				mustFlush(&fsms, &tags, &offsets, &aliases, m, db)
 				timer.Reset(timeInterval)
 				lastOffset = m.Offset
 			}
@@ -76,7 +77,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 	}
 }
 
-func mustFlush(fsms *fsms, tags *tags, offsets *offsets, m message, db *mariaDB) {
+func mustFlush(fsms *fsms, tags *tags, offsets *offsets, aliases *aliases, m message, db *mariaDB) {
 	qs := []query{}
 	if q := fsms.flush(); q != nil {
 		qs = append(qs, *q)
@@ -86,6 +87,10 @@ func mustFlush(fsms *fsms, tags *tags, offsets *offsets, m message, db *mariaDB)
 	}
 	if q := offsets.flush(); q != nil {
 		qs = append(qs, *q)
+	}
+	if q := aliases.flush(); q != nil {
+		uaqs := db.updateAliases()
+		qs = append(qs, *q, uaqs[0], uaqs[1], uaqs[2])
 	}
 	qs = append(qs, db.saveScrape(m.Topic, m.Partition, m.Offset))
 
