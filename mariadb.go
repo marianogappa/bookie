@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"io/ioutil"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -188,6 +189,8 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 	for _, v := range fsmMap {
 		fsms = append(fsms, v)
 	}
+
+	sort.Sort(fsmSlice(fsms))
 
 	return fsms, nil
 }

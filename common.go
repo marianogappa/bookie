@@ -33,3 +33,17 @@ type fsm struct {
 	Created time.Time         `json:"created"`
 	ID      string            `json:"id"`
 }
+
+type fsmSlice []fsm
+
+func (f fsmSlice) Len() int {
+	return len(f)
+}
+
+func (f fsmSlice) Less(i, j int) bool {
+	return f[j].Created.After(f[i].Created)
+}
+
+func (f fsmSlice) Swap(i, j int) {
+	f[i], f[j] = f[j], f[i]
+}
