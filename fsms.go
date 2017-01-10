@@ -1,9 +1,6 @@
 package main
 
-import (
-	"strconv"
-	"time"
-)
+import "time"
 
 type fsms struct {
 	t map[string]time.Time
@@ -22,50 +19,43 @@ func (f *fsms) add(fsmId string, fsmAlias string, created string, layout string)
 	}
 }
 
-func (f *fsms) flush() *query {
+func (f *fsms) flush() []query {
+	var qs []query
+
 	if len(f.t) == 0 {
-		return nil
+		return qs
 	}
 
-	vs := make([]interface{}, len(f.t)*3)
-	i := 0
+	var vs, tmpVs []interface{}
 	for key, tm := range f.t {
 		fsmId, fsmAlias := extractKeys(key)
-		vs[i] = fsmId
-		i++
-		vs[i] = fsmAlias
-		i++
-		vs[i] = tm
-		i++
+
+		if fsmId == "" {
+			tmpVs = append(tmpVs, fsmAlias, tm)
+		} else {
+			vs = append(vs, fsmId, tm)
+		}
 	}
 
 	f.t = nil
 
-	return &query{
-		`INSERT INTO bookie.fsm(fsmID, fsmAlias, created) VALUES ` +
-			buildInsertTuples(3, len(vs)/3) +
-			` ON DUPLICATE KEY UPDATE created = LEAST(created, VALUES(created))`,
-		vs,
-	}
-}
-
-func (f fsms) parseTime(t string, layout string) time.Time {
-	var err error
-	var _icreated int64
-	var created time.Time
-
-	if layout == "unix" {
-		_icreated, err = strconv.ParseInt(t, 10, 64)
-		created = time.Unix(_icreated, 0)
-	} else if layout == "unixNano" {
-		_icreated, err = strconv.ParseInt(t, 10, 64)
-		created = time.Unix(0, _icreated)
-	} else {
-		created, err = time.Parse(layout, t)
+	if len(tmpVs) > 0 {
+		qs = append(qs, query{
+			`INSERT INTO bookie.tmpFSM(fsmAlias, created) VALUES ` +
+				buildInsertTuples(2, len(tmpVs)/2) +
+				` ON DUPLICATE KEY UPDATE created = LEAST(created, VALUES(created))`,
+			tmpVs,
+		})
 	}
 
-	if err != nil {
-		return time.Time{}
+	if len(vs) > 0 {
+		qs = append(qs, query{
+			`INSERT INTO bookie.fsm(fsmID, created) VALUES ` +
+				buildInsertTuples(2, len(vs)/2) +
+				` ON DUPLICATE KEY UPDATE created = LEAST(created, VALUES(created))`,
+			vs,
+		})
 	}
-	return created
+
+	return qs
 }

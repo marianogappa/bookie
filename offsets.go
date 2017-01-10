@@ -50,27 +50,47 @@ func (o *offsets) add(fsmId, fsmAlias, topic string, topic_partition int32, offs
 	}
 }
 
-func (o *offsets) flush() *query {
+func (o *offsets) flush() []query {
+	var qs []query
+
 	if len(o.o) == 0 {
-		return nil
+		return qs
 	}
 
-	vs := []interface{}{}
+	var vs, tmpVs []interface{}
 	for key, aux := range o.o {
 		for topic, aux2 := range aux {
 			for topic_partition, oi := range aux2 {
 				fsmId, fsmAlias := extractKeys(key)
-				vs = append(vs, fsmId, fsmAlias, topic, topic_partition, oi.startOffset, oi.lastOffset, oi.count, oi.updated)
+
+				if fsmId == "" {
+					tmpVs = append(tmpVs, fsmAlias, topic, topic_partition, oi.startOffset, oi.lastOffset, oi.count, oi.updated)
+				} else {
+					vs = append(vs, fsmId, topic, topic_partition, oi.startOffset, oi.lastOffset, oi.count, oi.updated)
+				}
 			}
 		}
 	}
 
 	o.o = nil
 
-	return &query{
-		sql: `INSERT INTO bookie.offset(fsmID, fsmAlias, topic, topic_partition, startOffset, lastOffset, count, updated) VALUES ` +
-			buildInsertTuples(8, len(vs)/8) +
-			` ON DUPLICATE KEY UPDATE lastOffset = VALUES(lastOffset), count = count + VALUES(count), updated = UTC_TIMESTAMP`,
-		values: vs,
+	if len(tmpVs) > 0 {
+		qs = append(qs, query{
+			sql: `INSERT INTO bookie.tmpOffset(fsmAlias, topic, topic_partition, startOffset, lastOffset, count, updated) VALUES ` +
+				buildInsertTuples(7, len(tmpVs)/7) +
+				` ON DUPLICATE KEY UPDATE lastOffset = VALUES(lastOffset), count = count + VALUES(count), updated = UTC_TIMESTAMP`,
+			values: tmpVs,
+		})
 	}
+
+	if len(vs) > 0 {
+		qs = append(qs, query{
+			sql: `INSERT INTO bookie.offset(fsmID, topic, topic_partition, startOffset, lastOffset, count, updated) VALUES ` +
+				buildInsertTuples(7, len(vs)/7) +
+				` ON DUPLICATE KEY UPDATE lastOffset = VALUES(lastOffset), count = count + VALUES(count), updated = UTC_TIMESTAMP`,
+			values: vs,
+		})
+	}
+
+	return qs
 }

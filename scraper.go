@@ -79,18 +79,13 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 
 func mustFlush(fsms *fsms, tags *tags, offsets *offsets, aliases *aliases, m message, db *mariaDB) {
 	qs := []query{}
-	if q := fsms.flush(); q != nil {
-		qs = append(qs, *q)
-	}
-	if q := tags.flush(); q != nil {
-		qs = append(qs, *q)
-	}
-	if q := offsets.flush(); q != nil {
-		qs = append(qs, *q)
-	}
+	qs = append(qs, fsms.flush()...)
+	qs = append(qs, tags.flush()...)
+	qs = append(qs, offsets.flush()...)
+
 	if q := aliases.flush(); q != nil {
-		uaqs := db.updateAliases()
-		qs = append(qs, *q, uaqs[0], uaqs[1], uaqs[2])
+		qs = append(qs, *q)
+		qs = append(qs, db.updateAliases()...)
 	}
 	qs = append(qs, db.saveScrape(m.Topic, m.Partition, m.Offset))
 

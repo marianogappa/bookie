@@ -1,10 +1,5 @@
 package main
 
-import (
-	"bytes"
-	"strings"
-)
-
 type tags struct {
 	t map[string]map[string]string
 }
@@ -24,52 +19,45 @@ func (t *tags) add(fsmId, fsmAlias, k, v string) {
 	t.t[key][k] = v
 }
 
-func (t *tags) flush() *query {
+func (t *tags) flush() []query {
+	var qs []query
+
 	if len(t.t) == 0 {
-		return nil
+		return qs
 	}
 
-	vs := []interface{}{}
+	var vs, tmpVs []interface{}
 	for key, aux := range t.t {
 		for k, v := range aux {
 			fsmID, fsmAlias := extractKeys(key)
-			vs = append(vs, fsmID, fsmAlias, k, v)
+
+			if fsmID == "" {
+				tmpVs = append(tmpVs, fsmAlias, k, v)
+			} else {
+				vs = append(vs, fsmID, k, v)
+			}
 		}
 	}
 
 	t.t = nil
 
-	return &query{
-		sql: `INSERT INTO bookie.tags(fsmID, fsmAlias, k, v) VALUES ` +
-			buildInsertTuples(4, len(vs)/4) +
-			` ON DUPLICATE KEY UPDATE v = VALUES(v)`,
-		values: vs,
+	if len(tmpVs) > 0 {
+		qs = append(qs, query{
+			sql: `INSERT INTO bookie.tmpTags(fsmAlias, k, v) VALUES ` +
+				buildInsertTuples(3, len(tmpVs)/3) +
+				` ON DUPLICATE KEY UPDATE v = VALUES(v)`,
+			values: tmpVs,
+		})
 	}
-}
 
-func buildInsertTuples(colN, rowN int) string {
-	s := bytes.NewBuffer([]byte{})
-	for i := 1; i <= rowN; i++ {
-		s.Write([]byte("("))
-		for j := 1; j <= colN; j++ {
-			s.Write([]byte("?"))
-			if j != colN {
-				s.Write([]byte(","))
-			}
-		}
-		s.Write([]byte(")"))
-		if i != rowN {
-			s.Write([]byte(","))
-		}
+	if len(vs) > 0 {
+		qs = append(qs, query{
+			sql: `INSERT INTO bookie.tags(fsmID, k, v) VALUES ` +
+				buildInsertTuples(3, len(vs)/3) +
+				` ON DUPLICATE KEY UPDATE v = VALUES(v)`,
+			values: vs,
+		})
 	}
-	return s.String()
-}
 
-func concatKeys(a, b string) string { // TODO JSON Marshal/Unmarshal is safer, but slower. Do we care?
-	return a + "@@separator@@" + b
-}
-
-func extractKeys(s string) (string, string) {
-	ks := strings.Split(s, "@@separator@@")
-	return ks[0], ks[1]
+	return qs
 }

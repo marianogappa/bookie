@@ -120,15 +120,18 @@ func (m *mariaDB) saveScrape(topic string, partition int32, offset int64) query 
 
 func (m *mariaDB) updateAliases() []query {
 	return []query{
-		{
-			sql: `UPDATE IGNORE bookie.tags t JOIN bookie.fsmAliases a USING (fsmAlias) SET t.fsmAlias = "", t.fsmID = a.fsmID WHERE t.fsmID = "" AND t.fsmAlias != ""`,
-		},
-		{
-			sql: `UPDATE IGNORE bookie.offset t JOIN bookie.fsmAliases a USING (fsmAlias) SET t.fsmAlias = "", t.fsmID = a.fsmID WHERE t.fsmID = "" AND t.fsmAlias != ""`,
-		},
-		{
-			sql: `UPDATE IGNORE bookie.fsm t JOIN bookie.fsmAliases a USING (fsmAlias) SET t.fsmAlias = "", t.fsmID = a.fsmID WHERE t.fsmID = "" AND t.fsmAlias != ""`,
-		},
+		{sql: `INSERT INTO bookie.tags (fsmID, k, v)
+						SELECT fsmID, k, v FROM bookie.tmpTags JOIN bookie.fsmAliases USING (fsmAlias)
+						ON DUPLICATE KEY UPDATE bookie.tags.fsmID = bookie.tags.fsmID`},
+		{sql: `DELETE bookie.tmpTags FROM bookie.tmpTags JOIN bookie.fsmAliases USING (fsmAlias)`},
+		{sql: `INSERT INTO bookie.offset (fsmID, topic, topic_partition, startOffset, lastOffset, count, updated)
+						SELECT fsmID, topic, topic_partition, startOffset, lastOffset, count, updated FROM bookie.tmpOffset JOIN bookie.fsmAliases USING (fsmAlias)
+						ON DUPLICATE KEY UPDATE bookie.offset.fsmID = bookie.offset.fsmID`},
+		{sql: `DELETE bookie.tmpOffset FROM bookie.tmpOffset JOIN bookie.fsmAliases USING (fsmAlias)`},
+		{sql: `INSERT INTO bookie.fsm (fsmID, created)
+						SELECT fsmID, created FROM bookie.tmpFSM JOIN bookie.fsmAliases USING (fsmAlias)
+						ON DUPLICATE KEY UPDATE bookie.fsm.fsmID = bookie.fsm.fsmID`},
+		{sql: `DELETE bookie.tmpFSM FROM bookie.tmpFSM JOIN bookie.fsmAliases USING (fsmAlias)`},
 	}
 }
 
