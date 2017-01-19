@@ -1,3 +1,6 @@
+package main
+
+var initSQL = `
 CREATE SCHEMA IF NOT EXISTS bookie;
 
 CREATE TABLE IF NOT EXISTS bookie.scrape (
@@ -77,3 +80,4 @@ CREATE TABLE IF NOT EXISTS bookie.tmpTags (
     PRIMARY KEY (id),
     UNIQUE KEY uniq (fsmAlias, k)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+`

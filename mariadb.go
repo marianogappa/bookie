@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"io/ioutil"
 	"sort"
 	"strings"
 	"sync"
@@ -59,12 +58,7 @@ func setupMariaDB(conf mariadbConfig, wipe bool) (*mariaDB, error) {
 }
 
 func mustRunMariaDBSQL(db *sql.DB) {
-	queries, err := ioutil.ReadFile("mariadb.sql")
-	if err != nil {
-		log.WithFields(log.Fields{"err": err}).Fatalf("Failed to read cql initialization file.")
-	}
-
-	mustRunQuery(db, string(queries))
+	mustRunQuery(db, string(initSQL))
 }
 
 func mustRunQuery(db *sql.DB, sql string) {
