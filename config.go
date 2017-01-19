@@ -31,8 +31,8 @@ type topicConfig struct {
 	TimeLayout string            `json:"timeLayout"`
 }
 
-func mustReadConfig() config {
-	raw, err := ioutil.ReadFile("./config.json")
+func mustReadConfig(configFile string) config {
+	raw, err := ioutil.ReadFile(configFile)
 	if err != nil {
 		log.Fatal(err)
 	}

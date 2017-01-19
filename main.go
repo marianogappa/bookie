@@ -7,11 +7,12 @@ import (
 
 var wipe = flag.Bool("wipe", false, "wipe out all stored data and start from scratch")
 var verbose = flag.Bool("v", false, "verbose")
+var configFile = flag.String("config", "./config.json", "(required) location of the configuration file")
 
 func main() {
 	flag.Parse()
 
-	config := mustReadConfig()
+	config := mustReadConfig(*configFile)
 	setupLogFormatter(config)
 	db := mustSetupMariaDB(config.Mariadb, *wipe)
 	scrapes := db.mustLoadScrapes()
