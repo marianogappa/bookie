@@ -99,6 +99,7 @@ func (m *mariaDB) mustRunTransaction(qs []query) {
 }
 
 func (m *mariaDB) saveScrape(topic string, partition int32, offset int64) query {
+	promLastScrapedOffset.WithLabelValues(topic, string(partition)).Set(float64(offset))
 	return query{
 		sql: `INSERT INTO bookie.scrape
 					(topic, topic_partition, lastOffset, updated)

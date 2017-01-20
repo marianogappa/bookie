@@ -16,8 +16,10 @@ type serverHandler struct {
 func (h *serverHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/fsm"):
+		promBookieRequests.Inc()
 		h.fsm(w, r)
 	case r.URL.Path == "/latest":
+		promBookieRequests.Inc()
 		h.latest(w, r)
 	default:
 		log.WithFields(log.Fields{"path": r.URL.Path}).Error("unsupported path")
