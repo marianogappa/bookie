@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type healthCheckHandler struct{}
@@ -17,6 +18,7 @@ func mustServeSnitch(addr string) {
 	mux := http.NewServeMux()
 	hc := &healthCheckHandler{}
 
+	mux.Handle("/metrics", prometheus.Handler())
 	mux.Handle("/health_check", hc)
 	log.WithFields(log.Fields{"address": addr}).Info("Serving snitch.")
 	log.Fatal(http.ListenAndServe(addr, mux))
