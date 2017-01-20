@@ -19,6 +19,7 @@ func scrape(k cluster, kt map[string]topicConfig, db *mariaDB) {
 func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfig, db *mariaDB) {
 	fsms := fsms{}
 	tags := tags{}
+	accumulators := accumulators{}
 	offsets := offsets{}
 	aliases := aliases{}
 	m := message{}
@@ -38,7 +39,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 				continue
 			}
 
-			fsmID, fsmAlias, fsmTags, err := processMessage(m, kt)
+			fsmID, fsmAlias, fsmTags, fsmAccumulators, err := processMessage(m, kt)
 			if err != nil {
 				log.WithFields(log.Fields{"err": err, "message": m}).Warn("Could not process message.")
 				continue
@@ -48,6 +49,11 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 			for k, v := range fsmTags {
 				if len(k) > 0 && len(v) > 0 {
 					tags.add(fsmID, fsmAlias, k, v)
+				}
+			}
+			for k, v := range fsmAccumulators {
+				if len(k) > 0 && v > 0 {
+					accumulators.add(fsmID, fsmAlias, k, v)
 				}
 			}
 			offsets.add(fsmID, fsmAlias, m.Topic, m.Partition, m.Offset)
@@ -60,7 +66,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 			}
 
 			if m.Offset-lastOffset >= offsetInterval {
-				mustFlush(&fsms, &tags, &offsets, &aliases, m, db)
+				mustFlush(&fsms, &tags, &accumulators, &offsets, &aliases, m, db)
 				if !timer.Stop() {
 					<-timer.C
 				}
@@ -69,7 +75,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 			}
 		case <-timer.C:
 			if m.Offset > 0 && m.Offset > lastOffset {
-				mustFlush(&fsms, &tags, &offsets, &aliases, m, db)
+				mustFlush(&fsms, &tags, &accumulators, &offsets, &aliases, m, db)
 				timer.Reset(timeInterval)
 				lastOffset = m.Offset
 			}
@@ -77,10 +83,11 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 	}
 }
 
-func mustFlush(fsms *fsms, tags *tags, offsets *offsets, aliases *aliases, m message, db *mariaDB) {
+func mustFlush(fsms *fsms, tags *tags, accumulators *accumulators, offsets *offsets, aliases *aliases, m message, db *mariaDB) {
 	qs := []query{}
 	qs = append(qs, fsms.flush()...)
 	qs = append(qs, tags.flush()...)
+	qs = append(qs, accumulators.flush()...)
 	qs = append(qs, offsets.flush()...)
 
 	if q := aliases.flush(); q != nil {

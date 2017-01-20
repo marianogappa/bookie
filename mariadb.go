@@ -119,6 +119,10 @@ func (m *mariaDB) updateAliases() []query {
 						SELECT fsmID, k, v FROM bookie.tmpTags JOIN bookie.fsmAliases USING (fsmAlias)
 						ON DUPLICATE KEY UPDATE bookie.tags.fsmID = bookie.tags.fsmID`},
 		{sql: `DELETE bookie.tmpTags FROM bookie.tmpTags JOIN bookie.fsmAliases USING (fsmAlias)`},
+		{sql: `INSERT INTO bookie.accumulators (fsmID, k, v)
+						SELECT fsmID, k, v FROM bookie.tmpAccumulators JOIN bookie.fsmAliases USING (fsmAlias)
+						ON DUPLICATE KEY UPDATE bookie.accumulators.fsmID = bookie.accumulators.fsmID`},
+		{sql: `DELETE bookie.tmpAccumulators FROM bookie.tmpAccumulators JOIN bookie.fsmAliases USING (fsmAlias)`},
 		{sql: `INSERT INTO bookie.offset (fsmID, topic, topic_partition, startOffset, lastOffset, count, updated)
 						SELECT fsmID, topic, topic_partition, startOffset, lastOffset, count, updated FROM bookie.tmpOffset JOIN bookie.fsmAliases USING (fsmAlias)
 						ON DUPLICATE KEY UPDATE bookie.offset.fsmID = bookie.offset.fsmID`},
@@ -308,6 +312,26 @@ func (m *mariaDB) findFSM(fsmID string) (fsm, error) {
 		tags[k] = v
 	}
 	fsm.Tags = tags
+
+	q = `SELECT k, v FROM bookie.accumulators WHERE fsmID = ?`
+	rows, err = m.db.Query(q, fsmID)
+	if err != nil {
+		return fsm, err
+	}
+	defer rows.Close()
+
+	accumulators := map[string]float64{}
+	for rows.Next() {
+		var k string
+		var v float64
+		if err = rows.Scan(&k, &v); err != nil {
+			fs["error"] = err
+			log.WithFields(fs).Errorf("failed to scan tags")
+			return fsm, err
+		}
+		accumulators[k] = v
+	}
+	fsm.Accumulators = accumulators
 
 	return fsm, nil
 }

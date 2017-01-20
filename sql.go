@@ -80,4 +80,22 @@ CREATE TABLE IF NOT EXISTS bookie.tmpTags (
     PRIMARY KEY (id),
     UNIQUE KEY uniq (fsmAlias, k)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS bookie.accumulators (
+    id int(11) NOT NULL AUTO_INCREMENT,
+    fsmID varchar(100) NOT NULL,
+    k varchar(100) NOT NULL,
+    v float NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uniq (fsmID, k)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS bookie.tmpAccumulators (
+    id int(11) NOT NULL AUTO_INCREMENT,
+    fsmAlias varchar(100) NOT NULL,
+    k varchar(100) NOT NULL,
+    v float NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uniq (fsmAlias, k)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 `

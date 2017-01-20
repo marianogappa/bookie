@@ -33,10 +33,11 @@ type topic struct {
 }
 
 type fsm struct {
-	Topics  map[string]topic  `json:"topics,omitempty"`
-	Tags    map[string]string `json:"tags"`
-	Created time.Time         `json:"created"`
-	ID      string            `json:"id"`
+	Topics       map[string]topic   `json:"topics,omitempty"`
+	Tags         map[string]string  `json:"tags"`
+	Accumulators map[string]float64 `json:"accumulators"`
+	Created      time.Time          `json:"created"`
+	ID           string             `json:"id"`
 }
 
 type fsmSlice []fsm
