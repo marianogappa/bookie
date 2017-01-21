@@ -34,8 +34,8 @@ type topic struct {
 
 type fsm struct {
 	Topics       map[string]topic   `json:"topics,omitempty"`
-	Tags         map[string]string  `json:"tags"`
-	Accumulators map[string]float64 `json:"accumulators"`
+	Tags         map[string]string  `json:"tags,omitempty"`
+	Accumulators map[string]float64 `json:"accumulators,omitempty"`
 	Created      time.Time          `json:"created"`
 	ID           string             `json:"id"`
 }
@@ -81,7 +81,7 @@ func extractKeys(s string) (string, string) {
 	return ks[0], ks[1]
 }
 
-func (f fsms) parseTime(t string, layout string) time.Time {
+func (f fsms) parseTime(t string, layout string) (time.Time, error) {
 	var err error
 	var _icreated int64
 	var created time.Time
@@ -96,8 +96,5 @@ func (f fsms) parseTime(t string, layout string) time.Time {
 		created, err = time.Parse(layout, t)
 	}
 
-	if err != nil {
-		return time.Time{}
-	}
-	return created
+	return created, err
 }

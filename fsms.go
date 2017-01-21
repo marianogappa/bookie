@@ -12,9 +12,12 @@ func (f *fsms) add(fsmId string, fsmAlias string, created string, layout string)
 	}
 
 	key := concatKeys(fsmId, fsmAlias)
-	tm := f.parseTime(created, layout)
+	tm, err := f.parseTime(created, layout)
+	if err != nil {
+		tm = time.Time{}
+	}
 
-	if _, ok := f.t[key]; !ok || f.t[key].After(tm) {
+	if _, ok := f.t[key]; !ok || f.t[key].IsZero() || (!tm.IsZero() && f.t[key].After(tm)) {
 		f.t[key] = tm
 	}
 }
@@ -43,7 +46,7 @@ func (f *fsms) flush() []query {
 		qs = append(qs, query{
 			`INSERT INTO bookie.tmpFSM(fsmAlias, created) VALUES ` +
 				buildInsertTuples(2, len(tmpVs)/2) +
-				` ON DUPLICATE KEY UPDATE created = LEAST(created, VALUES(created))`,
+				` ON DUPLICATE KEY UPDATE created = VALUES(created)`,
 			tmpVs,
 		})
 	}
@@ -52,7 +55,7 @@ func (f *fsms) flush() []query {
 		qs = append(qs, query{
 			`INSERT INTO bookie.fsm(fsmID, created) VALUES ` +
 				buildInsertTuples(2, len(vs)/2) +
-				` ON DUPLICATE KEY UPDATE created = LEAST(created, VALUES(created))`,
+				` ON DUPLICATE KEY UPDATE created = VALUES(created)`,
 			vs,
 		})
 	}

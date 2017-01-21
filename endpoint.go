@@ -57,8 +57,7 @@ func (h *serverHandler) latest(w http.ResponseWriter, r *http.Request) {
 	ns := r.URL.Query().Get("n")
 
 	if ns == "" {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
+		ns = "10"
 	}
 
 	n, err := strconv.Atoi(ns)

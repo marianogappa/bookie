@@ -135,14 +135,8 @@ func (m *mariaDB) updateAliases() []query {
 }
 
 func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
-	fsms := []fsm{} // TODO there must be one tag or it fails
-	q := `SELECT
-			f.fsmID, f.created, IFNULL(t.k, "") k, IFNULL(t.v, "") v
-		  FROM
-		    (SELECT fsmID, created FROM bookie.fsm ORDER BY created DESC LIMIT ?) f
-		  LEFT JOIN
-		    bookie.tags t USING(fsmID)
-		  `
+	fsms := []fsm{}
+	q := `SELECT fsmID, created FROM bookie.fsm ORDER BY created DESC LIMIT ?`
 
 	rows, err := m.db.Query(q, n)
 	if err != nil {
@@ -150,41 +144,88 @@ func (m *mariaDB) getLastNFSMs(n int) ([]fsm, error) {
 	}
 	defer rows.Close()
 
-	tm := map[string]map[string]string{}
 	fsmMap := map[string]fsm{}
+	ids := []string{}
 	for rows.Next() {
-		var fsmID, _created, k, v string
+		var fsmID, _created string
 
-		if err = rows.Scan(&fsmID, &_created, &k, &v); err != nil {
+		if err = rows.Scan(&fsmID, &_created); err != nil {
 			log.WithFields(log.Fields{"err": err, "number": n}).Errorf("failed to get last n fsms")
 			return fsms, err
 		}
-
-		tgs, ok := tm[fsmID]
-		if !ok {
-			tgs = map[string]string{}
-		}
-		tgs[k] = v
-		tm[fsmID] = tgs
 
 		created, err := time.Parse("2006-01-02 15:04:05", _created)
 		if err != nil {
 			return fsms, err
 		}
-		f, ok := fsmMap[fsmID]
-		if !ok {
-			f = fsm{
-				ID:      fsmID,
-				Created: created,
-			}
+
+		fsmMap[fsmID] = fsm{
+			ID:      fsmID,
+			Created: created,
+		}
+		ids = append(ids, fsmID)
+	}
+
+	if len(ids) == 0 {
+		return fsms, err
+	}
+
+	q = `SELECT fsmID, k, v FROM bookie.tags WHERE fsmID IN ('` + strings.Join(ids, `','`) + `')`
+	rows, err = m.db.Query(q)
+	if err != nil {
+		return fsms, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var fsmID, k, v string
+		if err = rows.Scan(&fsmID, &k, &v); err != nil {
+			log.WithFields(log.Fields{"err": err, "number": n}).Errorf("failed to get last n fsms")
+			return fsms, err
+		}
+		if len(fsmID) == 0 || len(k) == 0 || len(v) == 0 {
+			continue
 		}
 
-		ts := f.Tags
-		if ts == nil {
-			ts = map[string]string{}
+		f, ok := fsmMap[fsmID]
+		if !ok {
+			continue
 		}
-		ts[k] = v
-		f.Tags = ts
+		if f.Tags == nil {
+			f.Tags = map[string]string{}
+		}
+		f.Tags[k] = v
+
+		fsmMap[fsmID] = f
+	}
+
+	q = `SELECT fsmID, k, v FROM bookie.accumulators WHERE fsmID IN ('` + strings.Join(ids, `','`) + `')`
+	rows, err = m.db.Query(q)
+	if err != nil {
+		return fsms, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var fsmID, k string
+		var v float64
+		if err = rows.Scan(&fsmID, &k, &v); err != nil {
+			log.WithFields(log.Fields{"err": err, "number": n}).Errorf("failed to get last n fsms")
+			return fsms, err
+		}
+		if len(fsmID) == 0 || len(k) == 0 || v == 0 {
+			continue
+		}
+
+		f, ok := fsmMap[fsmID]
+		if !ok {
+			continue
+		}
+		if f.Accumulators == nil {
+			f.Accumulators = map[string]float64{}
+		}
+		f.Accumulators[k] = v
+
 		fsmMap[fsmID] = f
 	}
 
