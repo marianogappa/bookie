@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+
+	log "github.com/Sirupsen/logrus"
 )
 
 var wipe = flag.Bool("wipe", false, "wipe out all stored data and start from scratch")
@@ -14,6 +16,7 @@ func main() {
 
 	config := mustReadConfig(*configFile)
 	setupLogFormatter(config)
+	log.WithField("config", config).Info("Loaded config.")
 	db := mustSetupMariaDB(config.Mariadb, *wipe)
 	scrapes := db.mustLoadScrapes()
 	kafka := mustSetupCluster(config.Kafka, scrapes)

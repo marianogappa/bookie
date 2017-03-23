@@ -109,7 +109,11 @@ func mustSetupCluster(conf kafkaConfig, scrapes map[string]topicRecord) cluster 
 	}
 
 	for _, tr := range scrapes {
-		c.addTopic(tr, conf.BootstrapFrom)
+		log.WithFields(log.Fields{"topic": tr.topic, "partitions": tr.partitions}).Info("Trying to consume...")
+		err := c.addTopic(tr, conf.BootstrapFrom)
+		if err != nil {
+			log.WithError(err).Fatal("Could not add topic ", tr.topic)
+		}
 	}
 
 	return c
