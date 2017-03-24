@@ -89,11 +89,8 @@ func mustFlush(fsms *fsms, tags *tags, accumulators *accumulators, offsets *offs
 	qs = append(qs, tags.flush()...)
 	qs = append(qs, accumulators.flush()...)
 	qs = append(qs, offsets.flush()...)
-
-	if q := aliases.flush(); q != nil {
-		qs = append(qs, *q)
-		qs = append(qs, db.updateAliases()...)
-	}
+	qs = append(qs, aliases.flush()...)
+	qs = append(qs, db.updateAliases()...)
 	qs = append(qs, db.saveScrape(m.Topic, m.Partition, m.Offset))
 
 	db.mustRunTransaction(qs)

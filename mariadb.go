@@ -121,7 +121,7 @@ func (m *mariaDB) updateAliases() []query {
 		{sql: `DELETE bookie.tmpTags FROM bookie.tmpTags JOIN bookie.fsmAliases USING (fsmAlias)`},
 		{sql: `INSERT INTO bookie.accumulators (fsmID, k, v)
 						SELECT fsmID, k, v FROM bookie.tmpAccumulators JOIN bookie.fsmAliases USING (fsmAlias)
-						ON DUPLICATE KEY UPDATE bookie.accumulators.fsmID = bookie.accumulators.fsmID`},
+						ON DUPLICATE KEY UPDATE bookie.accumulators.v = bookie.accumulators.v + VALUES(v)`},
 		{sql: `DELETE bookie.tmpAccumulators FROM bookie.tmpAccumulators JOIN bookie.fsmAliases USING (fsmAlias)`},
 		{sql: `INSERT INTO bookie.offset (fsmID, topic, topic_partition, startOffset, lastOffset, count, updated)
 						SELECT fsmID, topic, topic_partition, startOffset, lastOffset, count, updated FROM bookie.tmpOffset JOIN bookie.fsmAliases USING (fsmAlias)

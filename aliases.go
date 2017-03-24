@@ -14,7 +14,7 @@ func (a *aliases) add(fsmId string, fsmAlias string) {
 	}
 }
 
-func (a *aliases) flush() *query {
+func (a *aliases) flush() []query {
 	if len(a.a) == 0 {
 		return nil
 	}
@@ -30,10 +30,12 @@ func (a *aliases) flush() *query {
 
 	a.a = nil
 
-	return &query{
-		`INSERT INTO bookie.fsmAliases(fsmID, fsmAlias) VALUES ` +
-			buildInsertTuples(2, len(vs)/2) +
-			` ON DUPLICATE KEY UPDATE fsmID=fsmID`,
-		vs,
+	return []query{
+		{
+			`INSERT INTO bookie.fsmAliases(fsmID, fsmAlias) VALUES ` +
+				buildInsertTuples(2, len(vs)/2) +
+				` ON DUPLICATE KEY UPDATE fsmID=fsmID`,
+			vs,
+		},
 	}
 }
