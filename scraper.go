@@ -66,7 +66,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 			}
 
 			if m.Offset-lastOffset >= offsetInterval {
-				mustFlush(&fsms, &tags, &accumulators, &offsets, &aliases, m, db)
+				mustFlush([]flushable{&fsms, &tags, &accumulators, &offsets, &aliases}, m, db)
 				if !timer.Stop() {
 					<-timer.C
 				}
@@ -75,7 +75,7 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 			}
 		case <-timer.C:
 			if m.Offset > 0 && m.Offset > lastOffset {
-				mustFlush(&fsms, &tags, &accumulators, &offsets, &aliases, m, db)
+				mustFlush([]flushable{&fsms, &tags, &accumulators, &offsets, &aliases}, m, db)
 				timer.Reset(timeInterval)
 				lastOffset = m.Offset
 			}
@@ -83,13 +83,16 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 	}
 }
 
-func mustFlush(fsms *fsms, tags *tags, accumulators *accumulators, offsets *offsets, aliases *aliases, m message, db *mariaDB) {
+type flushable interface {
+	flush() []query
+}
+
+func mustFlush(fs []flushable, m message, db *mariaDB) {
 	qs := []query{}
-	qs = append(qs, fsms.flush()...)
-	qs = append(qs, tags.flush()...)
-	qs = append(qs, accumulators.flush()...)
-	qs = append(qs, offsets.flush()...)
-	qs = append(qs, aliases.flush()...)
+	for _, f := range fs {
+		qs = append(qs, f.flush()...)
+	}
+
 	qs = append(qs, db.updateAliases()...)
 	qs = append(qs, db.saveScrape(m.Topic, m.Partition, m.Offset))
 
