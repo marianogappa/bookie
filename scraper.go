@@ -17,18 +17,19 @@ func scrape(k cluster, kt map[string]topicConfig, db *mariaDB) {
 }
 
 func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfig, db *mariaDB) {
-	fsms := fsms{}
-	tags := tags{}
-	accumulators := accumulators{}
-	offsets := offsets{}
-	aliases := aliases{}
-	m := message{}
-	var err error
-
-	timeInterval := 5 * time.Second
-	offsetInterval := int64(2500)
-	lastOffset := int64(0)
-	timer := time.NewTimer(timeInterval)
+	var (
+		fsms           = fsms{}
+		tags           = tags{}
+		accumulators   = accumulators{}
+		offsets        = offsets{}
+		aliases        = aliases{}
+		m              = message{}
+		err            error
+		timeInterval   = 5 * time.Second
+		offsetInterval = int64(2500)
+		lastOffset     = int64(0)
+		timer          = time.NewTimer(timeInterval)
+	)
 
 	for {
 		select {
