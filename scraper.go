@@ -24,12 +24,21 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 		offsets        = offsets{}
 		aliases        = aliases{}
 		m              = message{}
-		err            error
 		timeInterval   = 5 * time.Second
 		offsetInterval = int64(2500)
 		lastOffset     = int64(0)
 		timer          = time.NewTimer(timeInterval)
+		err            error
 	)
+
+	flush := func() {
+		mustFlush([]flushable{&fsms, &tags, &accumulators, &offsets, &aliases}, m, db)
+		if !timer.Stop() {
+			<-timer.C
+		}
+		timer.Reset(timeInterval)
+		lastOffset = m.Offset
+	}
 
 	for {
 		select {
@@ -67,18 +76,11 @@ func scrapePartition(ch <-chan *sarama.ConsumerMessage, kt map[string]topicConfi
 			}
 
 			if m.Offset-lastOffset >= offsetInterval {
-				mustFlush([]flushable{&fsms, &tags, &accumulators, &offsets, &aliases}, m, db)
-				if !timer.Stop() {
-					<-timer.C
-				}
-				timer.Reset(timeInterval)
-				lastOffset = m.Offset
+				flush()
 			}
 		case <-timer.C:
 			if m.Offset > 0 && m.Offset > lastOffset {
-				mustFlush([]flushable{&fsms, &tags, &accumulators, &offsets, &aliases}, m, db)
-				timer.Reset(timeInterval)
-				lastOffset = m.Offset
+				flush()
 			}
 		}
 	}
